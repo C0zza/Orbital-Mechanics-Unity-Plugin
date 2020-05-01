@@ -285,6 +285,13 @@ namespace OrbitalMechanicsForUnity
             return Math.Sqrt((GravitationalConstant * primaryMass) / Math.Pow(r, 3d));
         }
 
+        //public static double AngularVelocity2(double primaryMass, DVector3 primaryPos, DVector3 bodyPos, double semiMajorAxis)
+        //{
+        //    double r = DVector3.Distance(primaryPos, bodyPos);
+
+        //    double result = (Math.Sqrt(GravitationalConstant * primaryMass * ((2 / r) - (1 / semiMajorAxis))) * DVector3.DotProduct()) / r;
+        //}
+
         public static Vector3 PositionInOrbit(double trueAnomaly, double semiMajorAxis, double eccentricity, double inclination, double longitudeOfAscendingNode,
                                               double argumentOfPeriapsis) // returns vector3 of position in orbit at given true anomaly
         {   // CREATE DOUBLE PRECISION QUATERNION CLASS?
