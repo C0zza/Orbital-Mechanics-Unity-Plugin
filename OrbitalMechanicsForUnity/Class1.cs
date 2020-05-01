@@ -29,7 +29,9 @@ namespace OrbitalMechanicsForUnity
                 {
                     primaryMass = Primary.mass;
                     primaryPos = Primary.GetPosition();
-                    Debug.Log(OrbitalMechanics.OrbitalPeriod(primaryMass, orbit.SemiMajorAxis, mass));
+                    Debug.Log("positions");
+                    DVector3.LogDVector3(primaryPos);
+                    DVector3.LogDVector3(position);
                 }
                 else
                 {
