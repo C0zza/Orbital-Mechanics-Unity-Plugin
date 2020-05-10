@@ -287,15 +287,14 @@ namespace OrbitalMechanicsForUnity
         public static double TrueAnomalyAfterTime(double semiMajorAxis, double eccentricity, double trueAnomaly, float timePassed, double primaryMass)
         {
             double v0 = trueAnomaly * Math.PI / 180d;   // Initial true anomaly in radians
-            Debug.Log("v0: " + v0);
-            double e0 = Math.Acos((eccentricity + Math.Cos(v0)) / (1 + eccentricity * Math.Cos(v0))); // Initial eccentric anomaly
-            Debug.Log("e0: " + e0);
+            //double e0 = Math.Acos((eccentricity + Math.Cos(v0)) / (1 + eccentricity * Math.Cos(v0))); // Initial eccentric anomaly
+            double e0 = Math.Atan2(Math.Sqrt((1d - eccentricity) / (1d + eccentricity)) * Math.Sin(v0 / 2d), Math.Cos(v0 / 2d));
+            e0 *= 2d;
             double m0 = e0 - eccentricity * Math.Sin(e0);   // Initial mean anomaly
-            Debug.Log("m0: " + m0);
+            //double m0 = e0 - eccentricity * Math.Sin(e0) * 180d / Math.PI;
             double n = Math.Sqrt((GravitationalConstant * primaryMass) / Math.Pow(semiMajorAxis, 3));   // Mean motion
-            Debug.Log("n: " + n);
             double m = m0 + n * (timePassed);   // mean anomaly at new position
-            Debug.Log("m: " + m);
+
             double a1 = m + eccentricity * Math.Sin(2d);    // first answer to iteration
             double a2 = 0; 
             bool iterationComplete = false;
@@ -306,18 +305,17 @@ namespace OrbitalMechanicsForUnity
                 if(Math.Round(a1, 5) == Math.Round(a2, 5))
                 {
                     iterationComplete = true;
-                    Debug.Log("E: " + a2);
                 }
                 else
                 {
                     a1 = a2;
                 }
             }
-            
-            double v = Math.Acos((Math.Cos(a2) - eccentricity) / (1 - eccentricity * Math.Cos(a2)));
-            Debug.Log("v: " + v);
-            return v * 180d / Math.PI;
 
+            //double v = Math.Acos((Math.Cos(a2) - eccentricity) / (1 - eccentricity * Math.Cos(a2)));
+            double v = 2d * Math.Atan(Math.Sqrt((1d + eccentricity) / (1d - eccentricity)) * Math.Tan(a2 / 2d));
+            double vDeg = v * 180d / Math.PI;
+            return vDeg;
         }
 
         public static Vector3 PositionInOrbit(double trueAnomaly, double semiMajorAxis, double eccentricity, double inclination, double longitudeOfAscendingNode,
