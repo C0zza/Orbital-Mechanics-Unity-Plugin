@@ -24,17 +24,20 @@ namespace OrbitalMechanicsForUnity
             if(UniverseManager.GetTimeScale() != 0 && Primary)
             {
 
-                double av = OrbitalMechanics.AngularVelocity(Primary.mass, Primary.GetPosition(),
-                                                            position) *
-                                                            (180d / Math.PI) * UniverseManager.GetTimeScale() * Time.deltaTime;
+                //double av = OrbitalMechanics.AngularVelocity(Primary.mass, Primary.GetPosition(),
+                //                                            position) *
+                //                                            (180d / Math.PI) * UniverseManager.GetTimeScale() * Time.deltaTime;
 
-                orbit.TrueAnomaly += av;
+                orbit.TrueAnomaly = OrbitalMechanics.TrueAnomalyAfterTime(orbit.SemiMajorAxis, orbit.Eccentricity, orbit.TrueAnomaly,
+                                                                          Time.deltaTime * (float)UniverseManager.GetTimeScale(), Primary.mass);
+
+                //orbit.TrueAnomaly += av;
 
                 if(orbit.TrueAnomaly > 360) // Clamp the true anomaly 0-360 to prevent the value from getting too large and causing data issues
                 {
                     orbit.TrueAnomaly -= 360;
                 }
-                else if(orbit.TrueAnomaly < 0)
+                else if (orbit.TrueAnomaly < 0)
                 {
                     orbit.TrueAnomaly += 360;
                 }
@@ -74,7 +77,7 @@ namespace OrbitalMechanicsForUnity
                 //return OrbitalMechanics.PositionInOrbit(orbit) + (new DVector3(Primary.transform.position) * OrbitalMechanics.AstronomicalUnit);
                 if(Primary.GetPosition() == null)
                 {
-                    Debug.Log("Primary Position is null for " + name);
+                    //Debug.Log("Primary Position is null for " + name);
                     return OrbitalMechanics.PositionInOrbit(orbit) + OrbitalMechanics.PositionInOrbit(Primary.Orbit());
                 }
                 else
@@ -124,12 +127,12 @@ namespace OrbitalMechanicsForUnity
 
             EditorGUILayout.ObjectField(primary);
             EditorGUILayout.PropertyField(mass);
-            EditorGUILayout.PropertyField(drawHillSphere);
 
             Body myBody = (Body)target;
 
             if(myBody.Primary)
             {
+                EditorGUILayout.PropertyField(drawHillSphere);
                 EditorGUILayout.PropertyField(orbit);
             }
 
@@ -279,6 +282,42 @@ namespace OrbitalMechanicsForUnity
         {
             double r = DVector3.Distance(primaryPosition, bodyPosition);
             return Math.Sqrt((GravitationalConstant * primaryMass) / Math.Pow(r, 3d));
+        }
+
+        public static double TrueAnomalyAfterTime(double semiMajorAxis, double eccentricity, double trueAnomaly, float timePassed, double primaryMass)
+        {
+            double v0 = trueAnomaly * Math.PI / 180d;   // Initial true anomaly in radians
+            Debug.Log("v0: " + v0);
+            double e0 = Math.Acos((eccentricity + Math.Cos(v0)) / (1 + eccentricity * Math.Cos(v0))); // Initial eccentric anomaly
+            Debug.Log("e0: " + e0);
+            double m0 = e0 - eccentricity * Math.Sin(e0);   // Initial mean anomaly
+            Debug.Log("m0: " + m0);
+            double n = Math.Sqrt((GravitationalConstant * primaryMass) / Math.Pow(semiMajorAxis, 3));   // Mean motion
+            Debug.Log("n: " + n);
+            double m = m0 + n * (timePassed);   // mean anomaly at new position
+            Debug.Log("m: " + m);
+            double a1 = m + eccentricity * Math.Sin(2d);    // first answer to iteration
+            double a2 = 0; 
+            bool iterationComplete = false;
+            while(!iterationComplete)
+            {
+                a2 = m + eccentricity * Math.Sin(a1);
+
+                if(Math.Round(a1, 5) == Math.Round(a2, 5))
+                {
+                    iterationComplete = true;
+                    Debug.Log("E: " + a2);
+                }
+                else
+                {
+                    a1 = a2;
+                }
+            }
+            
+            double v = Math.Acos((Math.Cos(a2) - eccentricity) / (1 - eccentricity * Math.Cos(a2)));
+            Debug.Log("v: " + v);
+            return v * 180d / Math.PI;
+
         }
 
         public static Vector3 PositionInOrbit(double trueAnomaly, double semiMajorAxis, double eccentricity, double inclination, double longitudeOfAscendingNode,
