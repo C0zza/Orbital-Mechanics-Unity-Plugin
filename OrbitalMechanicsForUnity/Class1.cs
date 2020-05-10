@@ -18,29 +18,17 @@ namespace OrbitalMechanicsForUnity
         [SerializeField]
         Orbit orbit = new Orbit();
         DVector3 position;
+
         public void UpdateBody()
         {
-            if(UniverseManager.GetTimeScale() != 0)
+            if(UniverseManager.GetTimeScale() != 0 && Primary)
             {
-                double primaryMass;
-                DVector3 primaryPos;
 
-                if (Primary)
-                {
-                    primaryMass = Primary.mass;
-                    primaryPos = Primary.GetPosition();
-                    Debug.Log("positions");
-                    DVector3.LogDVector3(primaryPos);
-                    DVector3.LogDVector3(position);
-                }
-                else
-                {
-                    primaryMass = OrbitalMechanics.SunMass;
-                    primaryPos = new DVector3(0d, 0d, 0d);
-                }
+                double av = OrbitalMechanics.AngularVelocity(Primary.mass, Primary.GetPosition(),
+                                                            position) *
+                                                            (180d / Math.PI) * UniverseManager.GetTimeScale() * Time.deltaTime;
 
-                orbit.TrueAnomaly += OrbitalMechanics.AngularVelocity(primaryMass, primaryPos, position) *
-                                     (180d / Math.PI) * UniverseManager.GetTimeScale() * Time.deltaTime;
+                orbit.TrueAnomaly += av;
 
                 if(orbit.TrueAnomaly > 360) // Clamp the true anomaly 0-360 to prevent the value from getting too large and causing data issues
                 {
@@ -51,37 +39,56 @@ namespace OrbitalMechanicsForUnity
                     orbit.TrueAnomaly += 360;
                 }
 
-                position = OrbitalMechanics.PositionInOrbit(orbit);
+                position = GetWorldPosition();
             }
         }
         private void Start()
         {
-            position = OrbitalMechanics.PositionInOrbit(orbit);
+            position = GetWorldPosition();
 
-            if(Primary)
+            if(UniverseManager.scaled && Primary)
             {
-                gameObject.transform.position += Primary.transform.position;
+                gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) / (float)OrbitalMechanics.AstronomicalUnit
+                                                   * (float)UniverseManager.GetUniverseScale();
             }
-
-            gameObject.transform.position = DVector3.GetFloatVector(position) / (float)OrbitalMechanics.AstronomicalUnit
-                                            * (float)UniverseManager.GetUniverseScale();
         }
         private void Update()
         {
             UpdateBody();
-            gameObject.transform.position = DVector3.GetFloatVector(position) / (float)OrbitalMechanics.AstronomicalUnit
-                                            * (float)UniverseManager.GetUniverseScale();
 
-            if(Primary)
+            if (UniverseManager.scaled && Primary)
             {
-                gameObject.transform.position += Primary.transform.position;
+                gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) / (float)OrbitalMechanics.AstronomicalUnit
+                                                   * (float)UniverseManager.GetUniverseScale();
             }
-
         }
         public DVector3 GetPosition()
         {
             return position;
         }
+
+        public DVector3 GetWorldPosition()
+        {
+            if(Primary)
+            {
+                //return OrbitalMechanics.PositionInOrbit(orbit) + (new DVector3(Primary.transform.position) * OrbitalMechanics.AstronomicalUnit);
+                if(Primary.GetPosition() == null)
+                {
+                    Debug.Log("Primary Position is null for " + name);
+                    return OrbitalMechanics.PositionInOrbit(orbit) + OrbitalMechanics.PositionInOrbit(Primary.Orbit());
+                }
+                else
+                {
+                    return OrbitalMechanics.PositionInOrbit(orbit) + Primary.GetPosition();
+                }
+                
+            }
+            else
+            {
+                return new DVector3(transform.position) * OrbitalMechanics.AstronomicalUnit;
+            }
+        }
+
         public Orbit Orbit()
         {
             return orbit;
@@ -91,14 +98,10 @@ namespace OrbitalMechanicsForUnity
         {
             if(DrawHillSphere)
             {
-                float hsr = (float)(hillSphereRadius);
-                // Debug.Log(hsr);
-
                 Gizmos.color = Color.blue;
-                Gizmos.DrawWireSphere(gameObject.transform.position, hsr);
+                Gizmos.DrawWireSphere(gameObject.transform.position, (float)(hillSphereRadius / OrbitalMechanics.AstronomicalUnit));
             }
         }
-
     }
 
     [CustomEditor(typeof(Body))]    // informs Unity which component it should act as an editor for
@@ -122,7 +125,13 @@ namespace OrbitalMechanicsForUnity
             EditorGUILayout.ObjectField(primary);
             EditorGUILayout.PropertyField(mass);
             EditorGUILayout.PropertyField(drawHillSphere);
-            EditorGUILayout.PropertyField(orbit);
+
+            Body myBody = (Body)target;
+
+            if(myBody.Primary)
+            {
+                EditorGUILayout.PropertyField(orbit);
+            }
 
             serializedObject.ApplyModifiedProperties();
         }
@@ -133,66 +142,50 @@ namespace OrbitalMechanicsForUnity
 
             if (!body) return;          
 
-            Orbit orbit = body.Orbit();
-
-            double primaryMass;    // Mass to pass through to hill sphere radius calculation.
-            DVector3 primaryPos;   
-
-            if(body.Primary) // If body is orbiting something other than the sun, get it's mass
+            if(body.Primary)
             {
-                primaryMass = body.Primary.mass;
-                primaryPos = new DVector3(body.Primary.transform.position);
-            } 
-            else // Otherwise, assign as sun mass.
-            {
-                primaryMass = OrbitalMechanics.SunMass;
-                primaryPos = new DVector3(0, 0, 0);
-            }
+                Orbit orbit = body.Orbit();
+                
+                body.hillSphereRadius = OrbitalMechanics.HillSphereRadius(new DVector3(body.transform.position) * OrbitalMechanics.AstronomicalUnit, // Calculate hill sphere radius
+                                                                          new DVector3(body.Primary.transform.position) * OrbitalMechanics.AstronomicalUnit, body.mass, body.Primary.mass);
 
-            body.hillSphereRadius = OrbitalMechanics.HillSphereRadius(new DVector3(body.transform.position), // Calculate hill sphere radius
-                                                                      primaryPos, body.mass, primaryMass);
-
-            Handles.SphereHandleCap(0, body.gameObject.transform.position, Quaternion.identity, // Draw hill sphere in editor window.
-                                   (float)(body.hillSphereRadius / OrbitalMechanics.AstronomicalUnit), EventType.Repaint);
-
-            if (orbit.RenderOrbit)   // Render the orbit path
-            {
-                var transform = body.gameObject.transform;
-
-                Vector3 offset = new Vector3(0, 0, 0);  // Vector that states where to draw the orbit relative to.
-                if (body.Primary)   // If body has a primary/ is orbiting something, get it's position.
+                if (orbit.RenderOrbit)   // Render the orbit path
                 {
+                    var transform = body.gameObject.transform;
+
+                    Vector3 offset = new Vector3(0, 0, 0);  // Vector that states where to draw the orbit relative to.
+                    
                     offset = body.Primary.transform.position;
+                    
+                    Vector3 v1 = OrbitalMechanics.PositionInOrbit(0d, orbit.SemiMajorAxis,
+                                 orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
+                                 orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale() + offset;
+
+                    if (!Application.isPlaying)
+                    {
+                        transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) / (float)OrbitalMechanics.AstronomicalUnit
+                                                                 * (float)UniverseManager.GetUniverseScale();
+                    }
+
+                    Vector3 v2;
+
+                    for (int i = 1; i < 30; i++)
+                    {
+                        v2 = OrbitalMechanics.PositionInOrbit(((360d / 30d) * i), orbit.SemiMajorAxis,
+                                                     orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
+                                                     orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit
+                                                     * (float)UniverseManager.GetUniverseScale() + offset;
+
+                        Handles.DrawLine(v1, v2);
+
+                        v1 = v2;
+                    }
+
+                    Handles.DrawLine(v1, OrbitalMechanics.PositionInOrbit(0d, orbit.SemiMajorAxis,
+                                         orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
+                                         orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit
+                                         * (float)UniverseManager.GetUniverseScale() + offset);
                 }
-
-                Vector3 v1 = OrbitalMechanics.PositionInOrbit(0d, orbit.SemiMajorAxis,
-                             orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
-                             orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale() + offset;
-
-                if(!Application.isPlaying)
-                {
-                    transform.position = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) / (float)OrbitalMechanics.AstronomicalUnit
-                                                             * (float)UniverseManager.GetUniverseScale() + offset;
-                }
-
-                Vector3 v2;
-
-                for (int i = 1; i < 30; i++)
-                {
-                    v2 = OrbitalMechanics.PositionInOrbit(((360d / 30d) * i), orbit.SemiMajorAxis,
-                                                 orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
-                                                 orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit
-                                                 * (float)UniverseManager.GetUniverseScale() + offset;
-
-                    Handles.DrawLine(v1, v2);
-
-                    v1 = v2;
-                }
-
-                Handles.DrawLine(v1, OrbitalMechanics.PositionInOrbit(0d, orbit.SemiMajorAxis,
-                                     orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
-                                     orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit
-                                     * (float)UniverseManager.GetUniverseScale() + offset);
             }
         }
     }
@@ -232,6 +225,7 @@ namespace OrbitalMechanicsForUnity
     {
         static double TimeScale = 1d;
         static double UniverseScale = 10d;
+        public static bool scaled = false;
         public static void SetTimeScale(double timeScale)
         {
             TimeScale = timeScale;
@@ -286,13 +280,6 @@ namespace OrbitalMechanicsForUnity
             double r = DVector3.Distance(primaryPosition, bodyPosition);
             return Math.Sqrt((GravitationalConstant * primaryMass) / Math.Pow(r, 3d));
         }
-
-        //public static double AngularVelocity2(double primaryMass, DVector3 primaryPos, DVector3 bodyPos, double semiMajorAxis)
-        //{
-        //    double r = DVector3.Distance(primaryPos, bodyPos);
-
-        //    double result = (Math.Sqrt(GravitationalConstant * primaryMass * ((2 / r) - (1 / semiMajorAxis))) * DVector3.DotProduct()) / r;
-        //}
 
         public static Vector3 PositionInOrbit(double trueAnomaly, double semiMajorAxis, double eccentricity, double inclination, double longitudeOfAscendingNode,
                                               double argumentOfPeriapsis) // returns vector3 of position in orbit at given true anomaly
