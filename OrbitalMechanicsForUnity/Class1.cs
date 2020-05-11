@@ -159,10 +159,22 @@ namespace OrbitalMechanicsForUnity
                     Vector3 offset = new Vector3(0, 0, 0);  // Vector that states where to draw the orbit relative to.
                     
                     offset = body.Primary.transform.position;
-                    
-                    Vector3 v1 = OrbitalMechanics.PositionInOrbit(0d, orbit.SemiMajorAxis,
-                                 orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
-                                 orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale() + offset;
+
+                    //Vector3 v1 = OrbitalMechanics.PositionInOrbit(0d, orbit.SemiMajorAxis,
+                    //             orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
+                    //             orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale() + offset;
+
+                    Vector3 v1 = OrbitalMechanics.PositionInOrbitMeasuredFromCenter(0d, orbit.SemiMajorAxis, orbit.Eccentricity, orbit.Inclination,
+                                                                                    orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis, offset);
+
+                    //////////
+                    // Testing
+
+                    Handles.color = Color.yellow;
+                    Handles.DrawWireCube(OrbitalMechanics.PositionInOrbitMeasuredFromCenter(orbit, offset), new Vector3(0.1f,0.1f,0.1f));
+
+                    Handles.color = Color.magenta;
+                    //////////
 
                     if (!Application.isPlaying)
                     {
@@ -174,20 +186,21 @@ namespace OrbitalMechanicsForUnity
 
                     for (int i = 1; i < 30; i++)
                     {
-                        v2 = OrbitalMechanics.PositionInOrbit(((360d / 30d) * i), orbit.SemiMajorAxis,
-                                                     orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
-                                                     orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit
-                                                     * (float)UniverseManager.GetUniverseScale() + offset;
+                        //v2 = OrbitalMechanics.PositionInOrbit(((360d / 30d) * i), orbit.SemiMajorAxis,
+                        //                             orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
+                        //                             orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit
+                        //                             * (float)UniverseManager.GetUniverseScale() + offset;
+
+                        v2 = OrbitalMechanics.PositionInOrbitMeasuredFromCenter(((360d / 30d) * i), orbit.SemiMajorAxis, orbit.Eccentricity, orbit.Inclination,
+                                                                                    orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis, offset);
 
                         Handles.DrawLine(v1, v2);
 
                         v1 = v2;
                     }
 
-                    Handles.DrawLine(v1, OrbitalMechanics.PositionInOrbit(0d, orbit.SemiMajorAxis,
-                                         orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
-                                         orbit.ArgumentOfPeriapsis) / (float)OrbitalMechanics.AstronomicalUnit
-                                         * (float)UniverseManager.GetUniverseScale() + offset);
+                    Handles.DrawLine(v1, OrbitalMechanics.PositionInOrbitMeasuredFromCenter(0d, orbit.SemiMajorAxis, orbit.Eccentricity, orbit.Inclination,
+                                                                                    orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis, offset));
                 }
             }
         }
@@ -318,6 +331,86 @@ namespace OrbitalMechanicsForUnity
             return vDeg;
         }
 
+        public static Vector3 PositionInOrbitMeasuredFromCenter(double trueAnomaly, double semiMajorAxis, double eccentricity, double inclination,
+                                                                double longitudeOfAscendingNode, double argumentOfPeriapsis, Vector3 offset)
+        {
+            double sma = SemiMinorAxis(semiMajorAxis, eccentricity);
+            double trueAnomalyRad = Math.Tan(trueAnomaly * Math.PI / 180d);
+
+            float x = (float)((semiMajorAxis * sma) /
+                             (Math.Sqrt(Math.Pow(sma, 2) + Math.Pow(semiMajorAxis, 2) * Math.Pow(trueAnomalyRad, 2))));
+
+            float y = (float)((semiMajorAxis * sma) /
+                            (Math.Sqrt(Math.Pow(semiMajorAxis, 2) + Math.Pow(sma, 2) / Math.Pow(trueAnomalyRad, 2))));
+
+            if (trueAnomaly >= 90d && trueAnomaly <= 270d)
+            {
+                x = -x;
+            }
+
+            if (trueAnomaly >= 180d && trueAnomaly <= 360d)
+            {
+                y = -y;
+            }
+
+            Quaternion pointRotation = Quaternion.Euler((float)longitudeOfAscendingNode * Vector3.up);
+            pointRotation *= Quaternion.AngleAxis((float)inclination, OrbitVector90(semiMajorAxis, eccentricity));
+            pointRotation *= Quaternion.AngleAxis((float)-argumentOfPeriapsis, Vector3.up);
+
+            Vector3 periapsisPos = (PositionInOrbit(0d, semiMajorAxis, eccentricity,
+                      inclination, longitudeOfAscendingNode, argumentOfPeriapsis) / (float)AstronomicalUnit * (float)UniverseManager.GetUniverseScale());
+            Vector3 apoapsisPos = (PositionInOrbit(180d, semiMajorAxis, eccentricity,
+                      inclination, longitudeOfAscendingNode, argumentOfPeriapsis) / (float)AstronomicalUnit * (float)UniverseManager.GetUniverseScale());
+
+            Vector3 v1test = pointRotation * new Vector3((float)y, 0, (float)x);
+            v1test /= (float)AstronomicalUnit;
+            v1test *= (float)UniverseManager.GetUniverseScale();
+            v1test += offset;
+            v1test += (apoapsisPos + periapsisPos) / 2f;
+
+            return v1test;
+        }
+
+        public static Vector3 PositionInOrbitMeasuredFromCenter(Orbit orbit, Vector3 offset)
+        {
+            double ta = orbit.TrueAnomaly;
+            double sma = SemiMinorAxis(orbit.SemiMajorAxis, orbit.Eccentricity);
+            double trueAnomalyRad = Math.Tan(ta * Math.PI / 180d);
+
+            float x = (float)((orbit.SemiMajorAxis * sma) /
+                             (Math.Sqrt(Math.Pow(sma, 2) + Math.Pow(orbit.SemiMajorAxis, 2) * Math.Pow(trueAnomalyRad, 2))));
+
+            float y = (float)((orbit.SemiMajorAxis * sma) /
+                            (Math.Sqrt(Math.Pow(orbit.SemiMajorAxis, 2) + Math.Pow(sma, 2) / Math.Pow(trueAnomalyRad, 2))));
+
+            if (orbit.TrueAnomaly >= 90d && orbit.TrueAnomaly <= 270d)
+            {
+                x = -x;
+            }
+
+            if (orbit.TrueAnomaly >= 180d && orbit.TrueAnomaly <= 360d)
+            {
+                y = -y;
+            }
+
+            Quaternion pointRotation = Quaternion.Euler((float)orbit.LongitudeOfAscendingNode * Vector3.up);
+            pointRotation *= Quaternion.AngleAxis((float)orbit.Inclination, OrbitVector90(orbit.SemiMajorAxis, orbit.Eccentricity));
+            pointRotation *= Quaternion.AngleAxis((float)-orbit.ArgumentOfPeriapsis, Vector3.up);
+
+            Vector3 periapsisPos = (PositionInOrbit(0d, orbit.SemiMajorAxis, orbit.Eccentricity,
+                      orbit.Inclination, orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis) / (float)AstronomicalUnit * (float)UniverseManager.GetUniverseScale());
+            Vector3 apoapsisPos = (PositionInOrbit(180d, orbit.SemiMajorAxis, orbit.Eccentricity,
+                      orbit.Inclination, orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis) / (float)AstronomicalUnit * (float)UniverseManager.GetUniverseScale());
+
+            Vector3 v1test = pointRotation * new Vector3((float)y, 0, (float)x);
+            v1test /= (float)AstronomicalUnit;
+            v1test *= (float)UniverseManager.GetUniverseScale();
+            v1test += offset;
+            v1test += (apoapsisPos + periapsisPos) / 2f;
+
+            return v1test;
+        }
+
         public static Vector3 PositionInOrbit(double trueAnomaly, double semiMajorAxis, double eccentricity, double inclination, double longitudeOfAscendingNode,
                                               double argumentOfPeriapsis) // returns vector3 of position in orbit at given true anomaly
         {   // CREATE DOUBLE PRECISION QUATERNION CLASS?
@@ -394,6 +487,11 @@ namespace OrbitalMechanicsForUnity
         public static double ApoapsisRadius(double semiMajorAxis, double eccentricity)  // Radius of the apoapsis of an orbit
         {
             return semiMajorAxis * (1 + eccentricity);
+        }
+
+        public static double SemiMinorAxis(double semiMajorAxis, double eccentricity)
+        {
+            return semiMajorAxis * Math.Sqrt(1d - Math.Pow(eccentricity, 2d));
         }
     }
 
