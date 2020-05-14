@@ -53,6 +53,26 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                                   (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale();
             }
         }
+
+        public void AddOrbitingBody(double mass = 1)
+        {
+            GameObject newBody = Instantiate(new GameObject(), transform);
+            newBody.transform.parent = transform;
+            newBody.name = "Body";
+            GameObject tempSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            tempSphere.transform.parent = newBody.transform;
+            tempSphere.transform.localPosition = new Vector3(0, 0, 0);
+            tempSphere.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
+
+            Body newBodyComponent = newBody.AddComponent<Body>();
+            if(Primary)
+            {
+                newBodyComponent.Orbit().SemiMajorAxis = hillSphereRadius / 2d;
+            }
+
+            newBodyComponent.Primary = this;
+            newBodyComponent.mass = mass;
+        }
         public DVector3 GetPosition()   // Get universe position of object
         {
             return position;
@@ -114,6 +134,14 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             {
                 EditorGUILayout.PropertyField(drawHillSphere);
                 EditorGUILayout.PropertyField(orbit);
+            }
+
+            if(myBody.mass > 1000000)
+            {
+                if(GUILayout.Button("Add Orbiting Body"))
+                {
+                    myBody.AddOrbitingBody();
+                }
             }
 
             serializedObject.ApplyModifiedProperties();
@@ -227,7 +255,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
     public class OrbitalMechanics   // The mathematics behind orbital mechanics
     {
         public const double GravitationalConstant = 0.0000000000667408d;    // Gravitational constant parameter, used to calculate GM
-        static public double AstronomicalUnit = 149597870700d / UniverseManager.GetUniverseScale(); // Scaled astronomical unit
+        static public double AstronomicalUnit = 149597870691d / UniverseManager.GetUniverseScale(); // Scaled astronomical unit
 
         public static double RadiusAtPointInOrbit(double semiMajorAxis, double eccentricity, double trueAnomaly)    // Radius of the point in an orbit at the given true anomaly
         {                                                                                                           
