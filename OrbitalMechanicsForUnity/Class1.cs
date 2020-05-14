@@ -145,9 +145,9 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                                                        orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis, body.Primary.transform.position);
                     Vector3 v2;
 
-                    for (int i = 1; i < 30; i++)
+                    for (int i = 1; i < orbit.OrbitResolution; i++)
                     {                                                                                    // Calculate next position in orbit
-                        v2 = OrbitalMechanics.PositionInOrbitMeasuredFromCenter(((360d / 30d) * i), orbit.SemiMajorAxis, orbit.Eccentricity,
+                        v2 = OrbitalMechanics.PositionInOrbitMeasuredFromCenter(((360d / orbit.OrbitResolution) * i), orbit.SemiMajorAxis, orbit.Eccentricity,
                             orbit.Inclination, orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis, body.Primary.transform.position);
 
                         Handles.DrawLine(v1, v2);   // Draw a line in the scene view from old point to new point
@@ -178,6 +178,8 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         public double TrueAnomaly;  // The current position within the orbit
 
         public bool RenderOrbit;
+        [Range(0f, 200f)]
+        public int OrbitResolution = 30;
 
         public Orbit()
         {
