@@ -258,16 +258,15 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             double m0 = e0 - eccentricity * Math.Sin(e0);   // Initial mean anomaly
             double n = Math.Sqrt((GravitationalConstant * primaryMass) / Math.Pow(semiMajorAxis, 3));   // Mean motion
             double m = m0 + n * (timePassed);   // mean anomaly at new position
-
+            // Calculating new eccentric anomaly
             double a1 = m + eccentricity * Math.Sin(2d);    // first answer to iteration
             double a2 = 0;
-            bool iterationComplete = false;
 
-            while(!iterationComplete)
+            while(true)
             {
                 a2 = m + eccentricity * Math.Sin(a1);
 
-                if(Math.Round(a1, 5) == Math.Round(a2, 5)) iterationComplete = true;
+                if (Math.Round(a1, 5) == Math.Round(a2, 5)) break;
                 else a1 = a2;
             }
 
