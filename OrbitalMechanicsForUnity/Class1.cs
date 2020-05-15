@@ -53,7 +53,6 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                                   (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale();
             }
         }
-
         public void AddOrbitingBody(double mass = 1)
         {
             GameObject newBody = Instantiate(new GameObject(), transform);
@@ -68,10 +67,15 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             if(Primary)
             {
                 newBodyComponent.Orbit().SemiMajorAxis = hillSphereRadius / 2d;
+                newBodyComponent.mass = 73476730900000000000000d;
+            }
+            else
+            {
+                newBodyComponent.mass = 597200000000000000000000d;
+                newBodyComponent.Orbit().SemiMajorAxis = OrbitalMechanics.AstronomicalUnit;
             }
 
             newBodyComponent.Primary = this;
-            newBodyComponent.mass = mass;
         }
         public DVector3 GetPosition()   // Get universe position of object
         {
@@ -141,6 +145,10 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 if(GUILayout.Button("Add Orbiting Body"))
                 {
                     myBody.AddOrbitingBody();
+                }
+                if(GUILayout.Button("Focus on Body"))
+                {
+                    UniverseManager.Focus(myBody);
                 }
             }
 
@@ -224,8 +232,9 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
     static public class UniverseManager // Manage global parameters effecting all bodies
     {
         static double TimeScale = 1d;
-        static double UniverseScale = 10d;
+        static double UniverseScale = 100d;
         public static bool scaled = false;
+        static GameObject currentFocus = null;
         public static void SetTimeScale(double timeScale)
         {
             TimeScale = timeScale;
@@ -250,12 +259,27 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         {
             return UniverseScale;
         }
+
+        public static void Focus(Body focus)
+        {
+            GameObject manager = GameObject.Find("UniverseManager");
+
+            if (!currentFocus)
+            {
+                currentFocus = manager;
+                manager.transform.position = new Vector3(0, 0, 0);
+            }
+
+            Vector3 movement = currentFocus.transform.position - focus.transform.position;
+            manager.transform.Translate(movement);
+            currentFocus = focus.gameObject;
+        }
     }
 
     public class OrbitalMechanics   // The mathematics behind orbital mechanics
     {
         public const double GravitationalConstant = 0.0000000000667408d;    // Gravitational constant parameter, used to calculate GM
-        static public double AstronomicalUnit = 149597870691d / UniverseManager.GetUniverseScale(); // Scaled astronomical unit
+        static public double AstronomicalUnit = 149597870700d; // Scaled astronomical unit
 
         public static double RadiusAtPointInOrbit(double semiMajorAxis, double eccentricity, double trueAnomaly)    // Radius of the point in an orbit at the given true anomaly
         {                                                                                                           
