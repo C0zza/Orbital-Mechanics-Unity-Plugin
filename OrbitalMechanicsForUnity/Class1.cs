@@ -66,7 +66,8 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             Body newBodyComponent = newBody.AddComponent<Body>();
             if(Primary)
             {
-                newBodyComponent.Orbit().SemiMajorAxis = hillSphereRadius / 2d;
+                newBodyComponent.Orbit().SemiMajorAxis = (hillSphereRadius / UniverseManager.GetUniverseScale()) / 2d;
+                Debug.Log(hillSphereRadius);
                 newBodyComponent.mass = 73476730900000000000000d;
             }
             else
@@ -388,7 +389,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         {   // CREATE DOUBLE PRECISION QUATERNION CLASS?
             double a = trueAnomaly * Math.PI / 180.0d;
             double d = RadiusAtPointInOrbit(semiMajorAxis, eccentricity, a);
-            double x = Math.Sin(trueAnomaly * Math.PI / 180.0d);
+            double x = -Math.Sin(trueAnomaly * Math.PI / 180.0d);
             double z = Math.Cos(trueAnomaly * Math.PI / 180.0d);
 
             Quaternion pointRotation = Quaternion.Euler((float)longitudeOfAscendingNode * Vector3.up);
@@ -402,7 +403,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         {   // CREATE DOUBLE PRECISION QUATERNION CLASS?
             double a = orbit.TrueAnomaly * Math.PI / 180.0d;
             double d = RadiusAtPointInOrbit(orbit.SemiMajorAxis, orbit.Eccentricity, a);
-            double x = Math.Sin(orbit.TrueAnomaly * Math.PI / 180.0d);
+            double x = -Math.Sin(orbit.TrueAnomaly * Math.PI / 180.0d);
             double z = Math.Cos(orbit.TrueAnomaly * Math.PI / 180.0d);
 
             Quaternion pointRotation = Quaternion.Euler((float)orbit.LongitudeOfAscendingNode * Vector3.up);
