@@ -353,7 +353,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             Quaternion pointRotation = Quaternion.Euler((float)longitudeOfAscendingNode * Vector3.up);
             pointRotation *= Quaternion.AngleAxis((float)inclination, OrbitVector90(semiMajorAxis, eccentricity));
-            pointRotation *= Quaternion.AngleAxis((float)-argumentOfPeriapsis, Vector3.up);
+            pointRotation *= Quaternion.AngleAxis((float)-argumentOfPeriapsis - 90f, Vector3.up);
 
             Vector3 periapsisPos = (PositionInOrbit(0d, semiMajorAxis, eccentricity,    // Get periapsis position
                       inclination, longitudeOfAscendingNode, argumentOfPeriapsis) / (float)AstronomicalUnit * (float)UniverseManager.GetUniverseScale());
@@ -381,7 +381,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             
             Quaternion pointRotation = Quaternion.Euler((float)orbit.LongitudeOfAscendingNode * Vector3.up);
             pointRotation *= Quaternion.AngleAxis((float)orbit.Inclination, OrbitVector90(orbit.SemiMajorAxis, orbit.Eccentricity));
-            pointRotation *= Quaternion.AngleAxis((float)-orbit.ArgumentOfPeriapsis, Vector3.up);
+            pointRotation *= Quaternion.AngleAxis((float)-orbit.ArgumentOfPeriapsis - 90f, Vector3.up);
             
             Vector3 periapsisPos = (PositionInOrbit(0d, orbit.SemiMajorAxis, orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode,
                                                  orbit.ArgumentOfPeriapsis) / (float)AstronomicalUnit * (float)UniverseManager.GetUniverseScale());
@@ -405,7 +405,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             Quaternion pointRotation = Quaternion.Euler((float)longitudeOfAscendingNode * Vector3.up);
             pointRotation *= Quaternion.AngleAxis((float)inclination, OrbitVector90(semiMajorAxis, eccentricity));
-            pointRotation *= Quaternion.AngleAxis((float)-argumentOfPeriapsis, Vector3.up);
+            pointRotation *= Quaternion.AngleAxis((float)-argumentOfPeriapsis - 90f, Vector3.up);
 
             return pointRotation * new Vector3((float)x, 0, (float)z).normalized * (float)(d);
         }
@@ -419,14 +419,14 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             Quaternion pointRotation = Quaternion.Euler((float)orbit.LongitudeOfAscendingNode * Vector3.up);
             pointRotation *= Quaternion.AngleAxis((float)orbit.Inclination, OrbitVector90(orbit.SemiMajorAxis, orbit.Eccentricity));
-            pointRotation *= Quaternion.AngleAxis((float)-orbit.ArgumentOfPeriapsis, Vector3.up);
+            pointRotation *= Quaternion.AngleAxis((float)-orbit.ArgumentOfPeriapsis - 90f, Vector3.up);
 
             return new DVector3(pointRotation * new Vector3((float)x, 0, (float)z).normalized * (float)(d));
         }
 
         public static Orbit OrbitalElementsFromStateVectors(DVector3 positionVector, DVector3 velocityVector, double primaryMass, Body body)
         {   // https://space.stackexchange.com/questions/1904/how-to-programmatically-calculate-orbital-elements-using-position-velocity-vecto
-
+            double smallNumber = 10e-8;
             DVector3 angularMomentum = DVector3.CrossProduct(positionVector, velocityVector);
             DVector3 nodeVector = DVector3.CrossProduct(new DVector3(0d, 1d, 0d), angularMomentum);
             // Variables to be used throughout function
@@ -434,12 +434,15 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             double velocityMagnitude = velocityVector.Magnitude();
             double positionMagnitude = positionVector.Magnitude();
             double angularMomentumMag = angularMomentum.Magnitude();
-            double GM = GravitationalConstant * primaryMass;
+            double GM = GravitationalConstant * primaryMass;    // Gtravity force of body being orbited
             // Calculate eccentricity
-            DVector3 eccentricityVector = ((Math.Pow(velocityMagnitude, 2d) - GM / positionMagnitude) * positionVector - 
-                                             DVector3.DotProduct(positionVector, velocityVector) * velocityVector) / GM;
+            DVector3 eccentricityVector = ((Math.Pow(velocityMagnitude, 2d) - GM / positionMagnitude) * positionVector - // Vector pointing from apoapsis to 
+                                             DVector3.DotProduct(positionVector, velocityVector) * velocityVector) / GM; // periapsis with magnitude of eccentricity
             orbit.Eccentricity = eccentricityVector.Magnitude();
 
+            //More variables used for calculations
+            double eccentrictyVectorMag = eccentricityVector.Magnitude();
+            double nodeVectorMag = nodeVector.Magnitude();
             double mechanicalEnergy = Math.Pow(velocityMagnitude, 2d) / 2d - GM / positionMagnitude;
             double period = 0d;
 
@@ -455,35 +458,71 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 orbit.SemiMajorAxis = double.PositiveInfinity;
             }
 
-            double eccentrictyVectorMag = eccentricityVector.Magnitude();
-            double nodeVectorMag = nodeVector.Magnitude();
-
             // Calculate inclination
             double temp1 = angularMomentum.y / angularMomentumMag;
             double temp2 = Math.Sqrt(1d - Math.Pow(temp1, 2d)) / temp1;
             orbit.Inclination = Math.Acos(temp1);                       // cos(Angle) = dot(a,b) / (mag(a) * mag(b))
             orbit.Inclination *= 180d / Math.PI; // Convert to degrees
 
-            // Calculate longitude of ascending node
-            orbit.LongitudeOfAscendingNode = Math.Acos(nodeVector.x / nodeVectorMag);
-            orbit.LongitudeOfAscendingNode *= 180d / Math.PI;  
-            if (nodeVector.z < 0d) orbit.LongitudeOfAscendingNode = 360d - orbit.LongitudeOfAscendingNode;
-            orbit.LongitudeOfAscendingNode = 360d - orbit.LongitudeOfAscendingNode;
+            if(orbit.Inclination < smallNumber) // If orbit is not inclined
+            {
+                orbit.LongitudeOfAscendingNode = 0d;    // longitude of ascending node is undefined so set to 0 by default
 
-            // Calculate argument of periapsis                                                                                                        
-            orbit.ArgumentOfPeriapsis = Math.Acos(DVector3.DotProduct(nodeVector, eccentricityVector) / (nodeVectorMag * eccentrictyVectorMag));
-            orbit.ArgumentOfPeriapsis *= 180d / Math.PI;
-            if (eccentricityVector.y < 0d) orbit.ArgumentOfPeriapsis = 360d - orbit.ArgumentOfPeriapsis;
+                if(orbit.Eccentricity < smallNumber)    // for circular orbits
+                {
+                    orbit.ArgumentOfPeriapsis = 0;  // set argument of periapsis to 0 / ascending node by default
+                }
+                else // Orbit is inclined but not circular
+                {
+                    orbit.ArgumentOfPeriapsis = Math.Acos(eccentricityVector.x / eccentrictyVectorMag);
+                    orbit.ArgumentOfPeriapsis *= 180d / Math.PI;
+                    if (eccentricityVector.z < 0d) orbit.ArgumentOfPeriapsis = 360d - orbit.ArgumentOfPeriapsis;
+                }
+            }
+            else
+            {
+                // Calculate longitude of ascending node
+                orbit.LongitudeOfAscendingNode = Math.Acos(nodeVector.x / nodeVectorMag);
+                orbit.LongitudeOfAscendingNode *= 180d / Math.PI;
+                if (nodeVector.z < 0d) orbit.LongitudeOfAscendingNode = 360d - orbit.LongitudeOfAscendingNode;
+                orbit.LongitudeOfAscendingNode = 360d - orbit.LongitudeOfAscendingNode;
 
-            if (orbit.ArgumentOfPeriapsis >= 0d && orbit.ArgumentOfPeriapsis < 90d) orbit.ArgumentOfPeriapsis = 90d - orbit.ArgumentOfPeriapsis;
-            else if (orbit.ArgumentOfPeriapsis >= 90d && orbit.ArgumentOfPeriapsis < 270d) orbit.ArgumentOfPeriapsis = 360 - (orbit.ArgumentOfPeriapsis - 90d);
-            else if (orbit.ArgumentOfPeriapsis >= 270d && orbit.ArgumentOfPeriapsis <= 360d) orbit.ArgumentOfPeriapsis = 90d + (360d - orbit.ArgumentOfPeriapsis);
+                // Calculate argument of periapsis                                                                                                        
+                orbit.ArgumentOfPeriapsis = Math.Acos(DVector3.DotProduct(nodeVector, eccentricityVector) / (nodeVectorMag * eccentrictyVectorMag));
+                orbit.ArgumentOfPeriapsis *= 180d / Math.PI;
+                if (eccentricityVector.z < 0d) orbit.ArgumentOfPeriapsis = 360d - orbit.ArgumentOfPeriapsis;
+                
+            }
 
             // Calculate true anomaly
+            //if(orbit.Eccentricity < smallNumber)
+            //{
+            //    if(orbit.Inclination < smallNumber)
+            //    {
+            //        Debug.Log("both");
+            //        orbit.TrueAnomaly = Math.Acos((positionVector.z / positionMagnitude));
+            //        if (velocityVector.z > 0d) orbit.TrueAnomaly = 2d * Math.PI - orbit.TrueAnomaly;
+            //        orbit.TrueAnomaly *= 180d / Math.PI;
+            //    }
+            //    else
+            //    {
+            //        Debug.Log("only e");
+            //        orbit.TrueAnomaly = Math.Acos(DVector3.DotProduct(nodeVector, positionVector) / (nodeVectorMag * positionMagnitude));
+            //        if(DVector3.DotProduct(nodeVector, velocityVector) > 0d)
+            //        {
+            //            orbit.TrueAnomaly = 2d * Math.PI - orbit.TrueAnomaly;
+            //        }
+            //        orbit.TrueAnomaly *= 180d / Math.PI;
+            //    }
+           // }
+            //else
+           // {
+                //Debug.Log("neither");
             orbit.TrueAnomaly = Math.Acos(DVector3.DotProduct(eccentricityVector, positionVector) / (eccentrictyVectorMag * positionMagnitude));
-            orbit.TrueAnomaly *= 180d / Math.PI;    
+            orbit.TrueAnomaly *= 180d / Math.PI;
             double temp = DVector3.DotProduct(positionVector, velocityVector);
             if (temp > 0d) orbit.TrueAnomaly = 360d - orbit.TrueAnomaly;
+            //}
 
             return orbit;
         }
@@ -510,7 +549,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             Handles.DrawLine(body.gameObject.transform.position, (final.normalized * 20) + body.gameObject.transform.position);   // Debugging line
             return new DVector3(final.normalized) * Velocity(body.Primary.mass, body.Primary.GetWorldPosition(), body.GetWorldPosition(), orbit.SemiMajorAxis); // Return normalised velocity direction vector multiplied by velocity magnitude
-        }                                           
+        }
 
         public static double Velocity(double primaryMass, DVector3 primaryPos, DVector3 bodyPos, double semiMajorAxis)  // Calculate velocity within an elliptical orbit
         {   // Formula for eliptical orbit velocity. Found at: http://www.braeunig.us/space/orbmech.htm#position (4.45)
