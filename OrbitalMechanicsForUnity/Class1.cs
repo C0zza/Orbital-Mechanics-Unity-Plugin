@@ -456,8 +456,8 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             double eccentrictyVectorMag = eccentricityVector.Magnitude();
             double nodeVectorMag = nodeVector.Magnitude();
             // Calculate inclination
-            double temp1 = angularMomentum.z / angularMomentumMag;
-            Debug.Log("h.z: " + angularMomentum.z + " h mag: " + angularMomentumMag);
+            double temp1 = angularMomentum.y / angularMomentumMag;
+            Debug.Log("h.z: " + angularMomentum.y + " h mag: " + angularMomentumMag);
             Debug.Log(temp1);
             double temp2 = Math.Sqrt(1d - Math.Pow(temp1, 2d)) / temp1;
             Debug.Log("t2: " + temp2);
@@ -465,14 +465,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             orbit.Inclination = Math.Acos(temp1);
             Debug.Log("orbit.i rad: " + orbit.Inclination);                         // cos(Angle) = dot(a,b) / (mag(a) * mag(b))
             orbit.Inclination *= 180d / Math.PI; // Convert to degrees
-            //if(angularMomentum.z > 0)
-            //{
-
-            //}
-            //if (orbit.Inclination >= -180d && orbit.Inclination <= -90d) orbit.Inclination = -180d - orbit.Inclination;
-            //if (orbit.Inclination >= -90d && orbit.Inclination <= 0d) orbit.Inclination = -90d - orbit.Inclination;
-           // else if (orbit.Inclination >= 0d && orbit.Inclination <= 90d) orbit.Inclination = 90d - orbit.Inclination;
-            //else if (orbit.Inclination >= 90d && orbit.Inclination <= 180d) orbit.Inclination = 180d - orbit.Inclination;
+             
 
             // Calculate longitude of ascending node
             orbit.LongitudeOfAscendingNode = Math.Acos(nodeVector.x / nodeVectorMag);
