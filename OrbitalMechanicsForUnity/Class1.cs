@@ -427,12 +427,8 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         public static Orbit OrbitalElementsFromStateVectors(DVector3 positionVector, DVector3 velocityVector, double primaryMass)
         {   // https://space.stackexchange.com/questions/1904/how-to-programmatically-calculate-orbital-elements-using-position-velocity-vecto
 
-            DVector3.LogDVector3(positionVector);
-            DVector3.LogDVector3(velocityVector);
-
             DVector3 angularMomentum = DVector3.CrossProduct(positionVector, velocityVector);
-            DVector3 nodeVector = DVector3.CrossProduct(new DVector3(0d, 0d, 1d), angularMomentum);
-
+            DVector3 nodeVector = DVector3.CrossProduct(new DVector3(0d, 1d, 0d), angularMomentum);
             double velocityMagnitude = velocityVector.Magnitude();
             double positionMagnitude = positionVector.Magnitude();
             double GM = GravitationalConstant * primaryMass;
@@ -461,9 +457,23 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             double nodeVectorMag = nodeVector.Magnitude();
             // Calculate inclination
             double temp1 = angularMomentum.z / angularMomentumMag;
+            Debug.Log("h.z: " + angularMomentum.z + " h mag: " + angularMomentumMag);
             Debug.Log(temp1);
-            orbit.Inclination = Math.Acos(temp1);                                               // cos(Angle) = dot(a,b) / (mag(a) * mag(b))
+            double temp2 = Math.Sqrt(1d - Math.Pow(temp1, 2d)) / temp1;
+            Debug.Log("t2: " + temp2);
+            //orbit.Inclination = Math.Atan(temp2);
+            orbit.Inclination = Math.Acos(temp1);
+            Debug.Log("orbit.i rad: " + orbit.Inclination);                         // cos(Angle) = dot(a,b) / (mag(a) * mag(b))
             orbit.Inclination *= 180d / Math.PI; // Convert to degrees
+            //if(angularMomentum.z > 0)
+            //{
+
+            //}
+            //if (orbit.Inclination >= -180d && orbit.Inclination <= -90d) orbit.Inclination = -180d - orbit.Inclination;
+            //if (orbit.Inclination >= -90d && orbit.Inclination <= 0d) orbit.Inclination = -90d - orbit.Inclination;
+           // else if (orbit.Inclination >= 0d && orbit.Inclination <= 90d) orbit.Inclination = 90d - orbit.Inclination;
+            //else if (orbit.Inclination >= 90d && orbit.Inclination <= 180d) orbit.Inclination = 180d - orbit.Inclination;
+
             // Calculate longitude of ascending node
             orbit.LongitudeOfAscendingNode = Math.Acos(nodeVector.x / nodeVectorMag);
             orbit.LongitudeOfAscendingNode *= 180d / Math.PI;  
@@ -510,28 +520,10 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             return Math.Sqrt(GravitationalConstant * primaryMass * (2d / DVector3.Distance(primaryPos, bodyPos) - 1d / semiMajorAxis));
         }
 
-        //public static Vector3 ConvertToECI(Body body, DVector3 vectorToConvert)
+        //public static vector3 converttoeci(body body, dvector3 vectortoconvert)
         //{
-        //    Vector3 axis = new Vector3(0, 0, 0);
-        //    Orbit orbit = body.Orbit();
-        //    Vector3 orbitUp = OrbitVectorUp(orbit.SemiMajorAxis, orbit.Eccentricity, orbit.Inclination, orbit.LongitudeOfAscendingNode);
-        //    float zAxisRotation = Mathf.Acos((Vector3.Dot(orbitUp, new Vector3(0,0,1))) / orbitUp.magnitude * 1f);
-        //    Vector3 unrotatedOrbit90 = OrbitVector90(orbit.SemiMajorAxis, orbit.Eccentricity);
-        //    Quaternion ascendingNodeRotation = Quaternion.Euler((float)orbit.LongitudeOfAscendingNode * Vector3.up);
-        //    ascendingNodeRotation *= Quaternion.AngleAxis((float)orbit.Inclination, OrbitVector90(orbit.SemiMajorAxis, orbit.Eccentricity));
-        //    ascendingNodeRotation *= Quaternion.AngleAxis((float)-orbit.ArgumentOfPeriapsis, Vector3.up);
-        //    Vector2 orbit90 = ascendingNodeRotation * unrotatedOrbit90;
-
-        //    float xAxisRotation = Mathf.Acos((Vector3.Dot(orbit90, new Vector3(1, 0, 0))) / orbit90.magnitude * 1f);
-        //    Vector3 yAxisUnrotated = Vector3.Cross(orbitUp, orbit90).normalized;
-        //    Vector3 yAxis = ascendingNodeRotation * yAxisUnrotated;
-        //    float yAxisRotation = Mathf.Acos((Vector3.Dot(yAxis, new Vector3(0, 1, 0))) / yAxis.magnitude * 1f);
-
-        //    Quaternion rotation = Quaternion.Euler(new Vector3(0, 0, 1) * zAxisRotation);
-        //    rotation *= Quaternion.AngleAxis(xAxisRotation, new Vector3(1, 0, 0));
-        //    rotation *= Quaternion.AngleAxis(yAxisRotation, new Vector3(0, 1, 0));
-
-        //    return rotation * DVector3.GetFloatVector(vectorToConvert);
+        //    vector3 axis = new vector3(0, 0, 0);
+        //    
         //}
 
         public static double FlightPathAngle(double semiMajorAxis, double eccentricity, Body body)
