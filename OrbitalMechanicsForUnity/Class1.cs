@@ -519,6 +519,10 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 orbit.ArgumentOfPeriapsis *= 180d / Math.PI;
                 if (rotatedEccentricityVector.z < 0d) orbit.ArgumentOfPeriapsis = 360d - orbit.ArgumentOfPeriapsis;
                 
+                if(orbit.Inclination > 90)
+                {
+                    orbit.ArgumentOfPeriapsis = 360d - orbit.ArgumentOfPeriapsis;
+                }
             }
 
             // Calculate true anomaly
