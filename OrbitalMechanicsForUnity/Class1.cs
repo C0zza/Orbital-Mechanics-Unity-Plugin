@@ -16,28 +16,28 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         Orbit       orbit = new Orbit();  // Orbital elements
         DVector3    position;          // Universe position
         bool        accelerating = false;
-        DVector3    currentForce;
+        DVector3    velocityVector;
         public void UpdateBody()    // Update body parameters/ details
         {
             if (UniverseManager.GetTimeScale() != 0 && Primary) // If time has not stopped and is orbiting something
             {   
                 if(accelerating)
                 {
-                    if(currentForce == null)
+                    if(velocityVector == null) // if velocity vector has been initialised
                     {
-                        currentForce = OrbitalMechanics.VelocityVector(orbit, this);
+                        velocityVector = OrbitalMechanics.VelocityVector(orbit, this);
                     }
-                    
-                    currentForce += new DVector3(gameObject.transform.forward.normalized * 100000) / mass; // Apply acceleration force
 
-                    DVector3 primaryForce2 = OrbitalMechanics.PositionVector(this).Normalized() * -Math.Pow((OrbitalMechanics.Velocity(Primary.mass, Primary.GetWorldPosition(),
-                                                             GetWorldPosition(), orbit.SemiMajorAxis)), 2d) / DVector3.Distance(GetWorldPosition(), Primary.GetWorldPosition());
-                    currentForce += primaryForce2;
-                    currentForce *= UniverseManager.GetTimeScale();
+                    velocityVector += new DVector3(gameObject.transform.forward * 1000) / mass; // Apply thrust
+                                                                                                                          // Calculate centripetal force (gravity of primary)
+                    DVector3 centripetalForce = OrbitalMechanics.PositionVector(this).Normalized() * -Math.Pow((OrbitalMechanics.Velocity(Primary.mass, Primary.position,
+                                                                                    position, orbit.SemiMajorAxis)), 2d) / DVector3.Distance(position, Primary.position);
+                    velocityVector += centripetalForce; // Apply centripetal force
+                    velocityVector *= UniverseManager.GetTimeScale();   // Adjust to current time scale (high time scales not recommended for accelerating)
 
-                    position += currentForce * Time.deltaTime;  // Update position with new velocity vector
+                    position += velocityVector * Time.deltaTime;  // Update position with new velocity vector
 
-                    orbit = OrbitalMechanics.OrbitalElementsFromStateVectors(OrbitalMechanics.PositionVector(this), currentForce, Primary.mass, this);
+                    orbit = OrbitalMechanics.OrbitalElementsFromStateVectors(OrbitalMechanics.PositionVector(this), velocityVector, Primary.mass, this);    // Update orbital elements
                 }
                 else
                 {
@@ -80,7 +80,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         public void StopAccelerating()
         {
             accelerating = false;
-            currentForce = null;
+            velocityVector = null;
         }
         public void AddOrbitingBody(double mass = 1)
         {
