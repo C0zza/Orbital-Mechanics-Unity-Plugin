@@ -6,8 +6,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 {
     [Serializable]
     public class Body : MonoBehaviour   
-    {
-        public double   bodyDiameter = 0;
+    { 
         public double   mass = 5972000000000000000000000d;    // Mass in kg of the body
         public double   hillSphereRadius;                     // The radius of this influence
         public bool     DrawHillSphere = true;                  // Whether to draw the body's area of dominant gravitational influence on other objects.
@@ -27,20 +26,16 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                     if(velocityVector == null) // if velocity vector has been initialised
                     {
                         velocityVector = OrbitalMechanics.VelocityVector(orbit, this);
-                        DVector3.LogDVector3(velocityVector);
                     }
 
-                    velocityVector += new DVector3(gameObject.transform.forward * 10) / mass; // Apply thrust
+                    velocityVector += new DVector3(gameObject.transform.forward * 1000) / mass; // Apply thrust
                                                                                                                           // Calculate centripetal force (gravity of primary)
                     DVector3 centripetalForce = OrbitalMechanics.PositionVector(this).Normalized() * -Math.Pow((OrbitalMechanics.Velocity(Primary.mass, Primary.position,
                                                                                     position, orbit.SemiMajorAxis)), 2d) / DVector3.Distance(position, Primary.position);
-                    DVector3.LogDVector3(centripetalForce);
-
                     velocityVector += centripetalForce; // Apply centripetal force
                     velocityVector *= UniverseManager.GetTimeScale();   // Adjust to current time scale (high time scales not recommended for accelerating)
 
                     position += velocityVector * Time.deltaTime;  // Update position with new velocity vector
-                    DVector3.LogDVector3(position);
 
                     orbit = OrbitalMechanics.OrbitalElementsFromStateVectors(OrbitalMechanics.PositionVector(this), velocityVector, Primary.mass, this);    // Update orbital elements
                 }
@@ -58,42 +53,25 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             }                              
                 
         }
-
-        private void Awake()
-        {
-            GameObject bodyObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            bodyObject.transform.localScale = new Vector3((float)bodyDiameter, (float)bodyDiameter, (float)bodyDiameter);
-            bodyObject.transform.parent = gameObject.transform;
-            bodyObject.transform.localPosition = new Vector3(0, 0, 0);
-        }
-
         private void Start()    // Standard Unity start function
         {
             position = GetWorldPosition();  // Initialise universe position
 
-            //if (UniverseManager.scaled && Primary)  // If universe is currently being scaled and this body is orbiting something
-            //{                                                             // Set game position to new universe position
-            //    gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) /
-            //                      (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale();
-            //}
-
-            gameObject.transform.position = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit));
-            //if (Primary) gameObject.transform.position += Primary.transform.position;
-            gameObject.transform.position -= DVector3.GetFloatVector(UniverseManager.GetCurrentOrigin());
+            if(UniverseManager.scaled && Primary)   // If universe is currently being scaled and this body is orbiting something
+            {                                                             // Set game position to new universe position
+                gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) /
+                                  (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale();
+            }
         }
         private void Update()   // Standard Unity update function
         {
             UpdateBody();
 
-            //if (UniverseManager.scaled && Primary)  // If universe is currently being scaled and this body is orbiting something
-            //{                                                             // Set game position to new universe position
-            //    gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) /
-            //                      (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale();
-            //}
-
-            gameObject.transform.position = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit));
-            //if (Primary) gameObject.transform.position += Primary.transform.position;
-            gameObject.transform.position -= DVector3.GetFloatVector(UniverseManager.GetCurrentOrigin());
+            if (UniverseManager.scaled && Primary)  // If universe is currently being scaled and this body is orbiting something
+            {                                                             // Set game position to new universe position
+                gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) /
+                                  (float)OrbitalMechanics.AstronomicalUnit * (float)UniverseManager.GetUniverseScale();
+            }
         }
         public void StartAccelerating()
         {
@@ -169,14 +147,13 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
     [CanEditMultipleObjects]        // Tells Unity that multiple objects can be selected and edited at the same time
     public class BodyEditor : Editor
     {
-        SerializedProperty mass, orbit, drawHillSphere, primary, diameter;    // Parameters to display within the inspector
+        SerializedProperty mass, orbit, drawHillSphere, primary;    // Parameters to display within the inspector
         void OnEnable() // When the body is created
         {
             mass = serializedObject.FindProperty("mass");
             orbit = serializedObject.FindProperty("orbit");
             drawHillSphere = serializedObject.FindProperty("DrawHillSphere");
             primary = serializedObject.FindProperty("Primary");
-            diameter = serializedObject.FindProperty("bodyDiameter");
         }
         public override void OnInspectorGUI()   // Update the inspector display when the body is modified
         {
@@ -184,7 +161,6 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             EditorGUILayout.ObjectField(primary);
             EditorGUILayout.PropertyField(mass);
-            EditorGUILayout.PropertyField(diameter);
 
             Body myBody = (Body)target;
 
@@ -200,10 +176,10 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 {
                     myBody.AddOrbitingBody();
                 }
-                //if(GUILayout.Button("Focus on Body"))
-                //{
-                //    UniverseManager.Focus(myBody);
-                //}
+                if(GUILayout.Button("Focus on Body"))
+                {
+                    UniverseManager.Focus(myBody);
+                }
             }
 
             myBody.Orbit().ValidateOrbit();
@@ -303,40 +279,12 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         }
     }   // Orbital elements container
 
-    public class UniverseManager : MonoBehaviour // Manage global parameters effecting all bodies
+    static public class UniverseManager // Manage global parameters effecting all bodies
     {
         static double TimeScale = 1d;
         static double UniverseScale = 100d; // 1 Astronomical Unit = universe scale unity units
         public static bool scaled = false;  // 
-        public GameObject currentFocus = null;
-        static DVector3 currentOrigin;
-        Body[] allBodies;
-
-        void Awake()
-        {
-            currentOrigin = OrbitalMechanics.PositionInOrbit(currentFocus.GetComponent<Body>().Orbit());
-        }
-
-        void Start()
-        {
-            allBodies = FindObjectsOfType<Body>();
-            Debug.Log(allBodies.Length);
-            //gameObject.transform.position = DVector3.GetFloatVector(currentFocus.GetComponent<Body>().GetWorldPosition());
-        }
-
-        void Update()
-        {
-            if(Vector3.Distance(currentFocus.transform.position, new Vector3(0,0,0)) > 600)
-            {
-                Debug.Log("Updating Origin");
-                //for(int i = 0; i < allBodies.Length; ++i)
-                //{
-                //    allBodies[i].gameObject.transform.position -= currentFocus.transform.position;
-                //}
-                currentOrigin = OrbitalMechanics.PositionInOrbit(currentFocus.GetComponent<Body>().Orbit());
-            }
-        }
-
+        static GameObject currentFocus = null;
         public static void SetTimeScale(double timeScale)
         {
             TimeScale = timeScale;
@@ -362,7 +310,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             return UniverseScale;
         }
 
-        public void Focus(Body focus)
+        public static void Focus(Body focus)
         {
             GameObject manager = GameObject.Find("UniverseManager");
 
@@ -375,11 +323,6 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             Vector3 movement = currentFocus.transform.position - focus.transform.position;
             manager.transform.Translate(movement);
             currentFocus = focus.gameObject;
-        }
-
-        public static DVector3 GetCurrentOrigin()
-        {
-            return currentOrigin;
         }
     }
 
