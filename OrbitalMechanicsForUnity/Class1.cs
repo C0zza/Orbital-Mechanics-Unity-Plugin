@@ -12,6 +12,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         public double   hillSphereRadius;                     // The radius of this influence
         public bool     DrawHillSphere = true;                  // Whether to draw the body's area of dominant gravitational influence on other objects.
         public Body     Primary = null;                         // The body being orbited (if any)
+        public BodyType bodyType;
 
         [SerializeField]
         Orbit       orbit = new Orbit();  // Orbital elements
@@ -61,7 +62,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             if(UniverseManager.scaled && Primary)   // If universe is currently being scaled and this body is orbiting something
             {                                                             // Set game position to new universe position
                 gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) /
-                                  (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
+                                            (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
             }
         }
         private void Update()   // Standard Unity update function
@@ -71,7 +72,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             if (UniverseManager.scaled && Primary)  // If universe is currently being scaled and this body is orbiting something
             {                                                             // Set game position to new universe position
                 gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) /
-                                  (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
+                                            (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
             }
         }
         public void StartAccelerating()
@@ -96,14 +97,16 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             Body newBodyComponent = newBody.AddComponent<Body>();
             if(Primary)
             {
-                newBodyComponent.Orbit().SemiMajorAxis = (hillSphereRadius / UniverseManager.GetUniverseScale()) / 2d;
-                Debug.Log(hillSphereRadius);
-                newBodyComponent.mass = 73476730900000000000000d;
+                newBodyComponent.Orbit().SemiMajorAxis = hillSphereRadius / 2d;
+                Debug.Log(newBodyComponent.Orbit().SemiMajorAxis);
+                newBodyComponent.mass = UniverseManager.Moon.Mass;
+                newBodyComponent.Diameter = UniverseManager.Moon.Diameter;
             }
             else
             {
-                newBodyComponent.mass = 597200000000000000000000d;
+                newBodyComponent.mass = UniverseManager.Planet.Mass;
                 newBodyComponent.Orbit().SemiMajorAxis = OrbitalMechanics.AstronomicalUnit;
+                newBodyComponent.Diameter = UniverseManager.Planet.Diameter;
             }
 
             newBodyComponent.Primary = this;
@@ -114,7 +117,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         }
         public DVector3 GetWorldPosition()  // Calculate and get universe position
         {
-            if(Primary)     // If body is orbiting something.
+            if(Primary != null)     // If body is orbiting something.
             {
                 if(Primary.GetPosition() == null)   // If primary's position member is not initialised
                 {
@@ -127,7 +130,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             }
             else // Body does not orbit anything
             {
-                return new DVector3(transform.position) * OrbitalMechanics.AstronomicalUnit; // Convert and return game position to universe position
+                return new DVector3(transform.position - GameObject.Find("UniverseManager").transform.position) * OrbitalMechanics.AstronomicalUnit; // Convert and return game position to universe position
             }
         }
         public Orbit Orbit()    // Get this body's orbit/ orbital elements
@@ -139,7 +142,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             if(DrawHillSphere)
             {
                 Gizmos.color = Color.blue;
-                Gizmos.DrawWireSphere(gameObject.transform.position, (float)(hillSphereRadius / OrbitalMechanics.AstronomicalUnit));
+                Gizmos.DrawWireSphere(gameObject.transform.position, (float)(hillSphereRadius / OrbitalMechanics.Scalar * UniverseManager.GetUniverseScale()));
             }
         }
     }       // Main component of the plugin, provides the behaviours of a satellite in space
@@ -161,11 +164,51 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         {
             serializedObject.Update();
 
+            Body myBody = (Body)target;
+
             EditorGUILayout.ObjectField(primary);
+
+            EditorGUILayout.BeginHorizontal();
             EditorGUILayout.PropertyField(mass);
+
+            BodyType massSelection;
+
+            if(myBody.mass == UniverseManager.Star.Mass) massSelection = BodyType.Star;
+            else if(myBody.mass == UniverseManager.Planet.Mass) massSelection = BodyType.Planet;
+            else if(myBody.mass == UniverseManager.Moon.Mass) massSelection = BodyType.Moon;
+            else massSelection = BodyType.Custom;
+            
+            BodyType newMassSelection = (BodyType)EditorGUILayout.EnumPopup(massSelection, GUILayout.MaxWidth(70));
+
+            if(newMassSelection != massSelection)
+            {
+                if(newMassSelection == BodyType.Star) myBody.mass = UniverseManager.Star.Mass;
+                else if(newMassSelection == BodyType.Planet)myBody.mass = UniverseManager.Planet.Mass;
+                else if(newMassSelection == BodyType.Moon)myBody.mass = UniverseManager.Moon.Mass;
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
             EditorGUILayout.PropertyField(diameter);
 
-            Body myBody = (Body)target;
+            BodyType diameterSelection;
+
+            if (myBody.Diameter == UniverseManager.Star.Diameter) diameterSelection = BodyType.Star;
+            else if (myBody.Diameter == UniverseManager.Planet.Diameter) diameterSelection = BodyType.Planet;
+            else if (myBody.Diameter == UniverseManager.Moon.Diameter) diameterSelection = BodyType.Moon;
+            else diameterSelection = BodyType.Custom;
+
+            BodyType newDiameterSelection = (BodyType)EditorGUILayout.EnumPopup(diameterSelection, GUILayout.MaxWidth(70));
+
+            if (newDiameterSelection != diameterSelection)
+            {
+                if (newDiameterSelection == BodyType.Star) myBody.Diameter = UniverseManager.Star.Diameter;
+                else if (newDiameterSelection == BodyType.Planet) myBody.Diameter = UniverseManager.Planet.Diameter;
+                else if (newDiameterSelection == BodyType.Moon) myBody.Diameter = UniverseManager.Moon.Diameter;
+            }
+
+            EditorGUILayout.EndHorizontal();
 
             if(myBody.Primary)
             {
@@ -204,9 +247,9 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             if(body.Primary)    // If the body is orbiting something
             {
                 Orbit orbit = body.Orbit(); // Get reference to body's orbit member 
-                                                                                                                     // Calculate hill sphere radius
-                body.hillSphereRadius = OrbitalMechanics.HillSphereRadius(new DVector3(body.transform.position) * OrbitalMechanics.AstronomicalUnit,
-                                   new DVector3(body.Primary.transform.position) * OrbitalMechanics.AstronomicalUnit, body.mass, body.Primary.mass);
+
+                // Calculate hill sphere radius
+                body.hillSphereRadius = OrbitalMechanics.HillSphereRadius(body.GetWorldPosition(), body.Primary.GetWorldPosition(), body.mass, body.Primary.mass);
 
                 if (!Application.isPlaying) // If in editor mode
                 {                                                                                // Set body's position in scene
@@ -299,6 +342,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         public static bool scaled = false;  // 
         static GameObject currentFocus = null;
 
+        public static BodyPreset Star = new BodyPreset(1392700000d, 1.989e+30d, 0d);
         public static BodyPreset Planet = new BodyPreset(12742000d, 5.972e+24d, 149598023000d);
         public static BodyPreset Moon = new BodyPreset(3474200d, 7.3476731e+22d, 384748000d);
 
@@ -741,6 +785,11 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             Mass = mass;
             SemiMajorAxis = semiMajorAxis;
         }
+    }
+
+    public enum BodyType
+    {
+        Star, Planet, Moon, Custom
     }
 
     public class DVector3   // Double precision 3D vector
