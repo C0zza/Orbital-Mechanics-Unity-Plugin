@@ -218,14 +218,10 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             if(myBody.mass > 1000000)
             {
-                if(GUILayout.Button("Add Orbiting Body"))
-                {
-                    myBody.AddOrbitingBody();
-                }
-                if(GUILayout.Button("Focus on Body"))
-                {
-                    UniverseManager.Focus(myBody);
-                }
+                if(GUILayout.Button("Add Orbiting Body")) myBody.AddOrbitingBody();
+                
+                if (GUILayout.Button("Focus on Body")) UniverseManager.Focus(myBody);
+
             }
 
             myBody.Orbit().ValidateOrbit();
@@ -261,25 +257,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 {                           
                     if(UniverseManager.GetCurrentFocus() != body)
                     {
-                        Handles.color = Color.magenta;  // Set orbit color to magenta
-                                                                                                                     // Get first position in the orbit
-                        Vector3 v1 = OrbitalMechanics.PositionInOrbitMeasuredFromCenter(0d, orbit.SemiMajorAxis, orbit.Eccentricity, orbit.Inclination,
-                                                           orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis, body.Primary.transform.position);
-                        Vector3 v2;
-
-                        for (int i = 1; i < orbit.OrbitResolution; i++)
-                        {                                                                                                      // Calculate next position in orbit
-                            v2 = OrbitalMechanics.PositionInOrbitMeasuredFromCenter(((360d / orbit.OrbitResolution) * i), orbit.SemiMajorAxis, orbit.Eccentricity,
-                                                   orbit.Inclination, orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis, body.Primary.transform.position);
-
-                            Handles.DrawLine(v1, v2);   // Draw a line in the scene view from old point to new point
-
-                            v1 = v2; // Set old point as newest point
-                        }
-
-                        // Draw final line to complete orbit drawing
-                        Handles.DrawLine(v1, OrbitalMechanics.PositionInOrbitMeasuredFromCenter(0d, orbit.SemiMajorAxis, orbit.Eccentricity,
-                            orbit.Inclination, orbit.LongitudeOfAscendingNode, orbit.ArgumentOfPeriapsis, body.Primary.transform.position));
+                        body.Orbit().DrawOrbitInEditor(body.Primary.transform.position, Color.magenta);
                     }                                                                           
                 }
             }
@@ -332,6 +310,29 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                     ArgumentOfPeriapsis = 0d;
                 }
             }
+        }
+
+        public void DrawOrbitInEditor(Vector3 primaryUnityPos, Color color)
+        {
+            Handles.color = color;  // Set orbit color to magenta
+                                            // Get first position in the orbit
+            Vector3 v1 = OrbitalMechanics.PositionInOrbitMeasuredFromCenter(0d, SemiMajorAxis, Eccentricity, Inclination,
+                                                         LongitudeOfAscendingNode, ArgumentOfPeriapsis, primaryUnityPos);
+            Vector3 v2;
+
+            for (int i = 1; i < OrbitResolution; i++)
+            {                                                                                                      // Calculate next position in orbit
+                v2 = OrbitalMechanics.PositionInOrbitMeasuredFromCenter(((360d / OrbitResolution) * i), SemiMajorAxis, Eccentricity,
+                                                          Inclination, LongitudeOfAscendingNode, ArgumentOfPeriapsis, primaryUnityPos);
+
+                Handles.DrawLine(v1, v2);   // Draw a line in the scene view from old point to new point
+
+                v1 = v2; // Set old point as newest point
+            }
+
+            // Draw final line to complete orbit drawing
+            Handles.DrawLine(v1, OrbitalMechanics.PositionInOrbitMeasuredFromCenter(0d, SemiMajorAxis, Eccentricity,
+                                      Inclination, LongitudeOfAscendingNode, ArgumentOfPeriapsis, primaryUnityPos));
         }
     }   // Orbital elements container
 
