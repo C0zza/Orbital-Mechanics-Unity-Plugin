@@ -337,13 +337,13 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
     static public class UniverseManager // Manage global parameters effecting all bodies
     {
-        static double TimeScale = 1d;
+        static double TimeScale = 1d;      // Amount of game seconds passed per second
         static double UniverseScale = 10d; // 1 Astronomical Unit = universe scale unity units
-        public static bool scaled = false;  // 
+        public static bool scaled = false; 
         static GameObject currentFocus = null;
 
-        public static BodyPreset Star = new BodyPreset(1392700000d, 1.989e+30d, 0d);
-        public static BodyPreset Planet = new BodyPreset(12742000d, 5.972e+24d, 149598023000d);
+        public static BodyPreset Star = new BodyPreset(1392700000d, 1.989e+30d, 0d);            // Celestial body presets so users have something to refer to
+        public static BodyPreset Planet = new BodyPreset(12742000d, 5.972e+24d, 149598023000d); // when inputting parameters
         public static BodyPreset Moon = new BodyPreset(3474200d, 7.3476731e+22d, 384748000d);
 
         public static void SetTimeScale(double timeScale)
@@ -375,27 +375,21 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         {
             GameObject manager = GameObject.Find("UniverseManager");
 
-            if (!currentFocus)
+            if (!currentFocus)  // If there is no current focus
             {
-                currentFocus = manager;
+                currentFocus = manager; // Initialise focus to manager object
                 manager.transform.position = new Vector3(0, 0, 0);
             }
 
-            OrbitalMechanics.Scalar = focus.Diameter;
+            OrbitalMechanics.Scalar = focus.Diameter;   // New reference unit for scale
 
-            DVector3 focusPos;
+            DVector3 focusPos;  // body position in Unity space
 
-            if(focus.Primary)
-            {
-                focusPos = focus.GetWorldPosition() / OrbitalMechanics.Scalar * GetUniverseScale();
-            }
-            else
-            {
-                focusPos = new DVector3(0, 0, 0);
-            }
-
-            manager.transform.position = -DVector3.GetFloatVector(focusPos);
-            currentFocus = focus.gameObject;
+            if(focus.Primary) focusPos = focus.GetWorldPosition() / OrbitalMechanics.Scalar * GetUniverseScale();
+            else focusPos = new DVector3(0, 0, 0);
+            
+            manager.transform.position = -DVector3.GetFloatVector(focusPos); // Move manager object so focus is positioned at 0,0,0 in unity space
+            currentFocus = focus.gameObject;    // set new focus
         }
 
         public static Body GetCurrentFocus()
@@ -785,7 +779,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             Mass = mass;
             SemiMajorAxis = semiMajorAxis;
         }
-    }
+    }   // Struct to save certain data about a body/orbit
 
     public enum BodyType
     {
