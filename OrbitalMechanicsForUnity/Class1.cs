@@ -52,11 +52,24 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
                     position = GetWorldPosition();  // Update universe position
                 }
-            }                              
-                
+            }
+
+            if (orbit.GetNextOrbit() != null)    // If on an escape trajectory
+            {
+                if (orbit.TrueAnomaly >= orbit.GetHillSphereExitTrueAnomaly())  // Check if true anomaly is greater than true anomaly at hill sphere exit
+                {
+                    orbit = orbit.GetNextOrbit();   // Set new orbit
+                    transform.parent = Primary.transform.parent;
+                    Primary = Primary.Primary;
+                    position = GetWorldPosition();  // Update universe position
+                }
+            }
+
         }
         private void Start()    // Standard Unity start function
         {
+            transform.parent = null;
+
             position = GetWorldPosition();  // Initialise universe position
 
             if(UniverseManager.scaled && Primary)   // If universe is currently being scaled and this body is orbiting something
@@ -69,10 +82,10 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         {
             UpdateBody();
 
-            if (UniverseManager.scaled && Primary)  // If universe is currently being scaled and this body is orbiting something
+            if (UniverseManager.scaled)  // If universe is currently being scaled and this body is orbiting something
             {                                                             // Set game position to new universe position
-                gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) /
-                                            (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
+                transform.position = DVector3.GetFloatVector((GetWorldPosition() - UniverseManager.GetCurrentFocus().GetComponent<Body>().GetWorldPosition())
+                                                                                              / OrbitalMechanics.Scalar * UniverseManager.GetUniverseScale());
             }
         }
         public void StartAccelerating()
@@ -281,7 +294,8 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         [Range(0f, 200f)]
         public int OrbitResolution = 30;
 
-        private Orbit nextOrbit = null;
+        private Orbit nextOrbit = null; // Orbit to transition to if on escape trajectory
+        private double hillSphereExitTrueAnomaly = 0d;  // True anomaly where transition takes place
 
         public Orbit()
         {
@@ -310,6 +324,14 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                     ArgumentOfPeriapsis = 0d;
                 }
             }
+
+            if(nextOrbit != null)
+            {
+                if (TrueAnomaly > hillSphereExitTrueAnomaly) // Clamp true anomaly to escape path
+                {
+                    TrueAnomaly = hillSphereExitTrueAnomaly;
+                }
+            }
         }
 
         public void DrawOrbitInEditor(Vector3 primaryUnityPos, Color color, Body body, Body primary, Orbit bodyOrbit)
@@ -324,7 +346,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             {
                 trueAnomalyAtEscape = OrbitalMechanics.TrueAnomalyAtHillSphereExit(OrbitalMechanics.HillSphereRadius(body.Primary.GetWorldPosition(),
                            primary.Primary.GetWorldPosition(), primary.mass, primary.Primary.mass), bodyOrbit.Eccentricity, bodyOrbit.SemiMajorAxis);
-                
+                bodyOrbit.SetHillSphereExitTrueAnomaly(trueAnomalyAtEscape);
             }
 
             Handles.color = color;  // Set orbit color to magenta
@@ -363,15 +385,14 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 // Draw final line to complete orbit drawing
                 Handles.DrawLine(v1, OrbitalMechanics.PositionInOrbitMeasuredFromCenter(0d, bodyOrbit.SemiMajorAxis, bodyOrbit.Eccentricity,
                                 bodyOrbit.Inclination, bodyOrbit.LongitudeOfAscendingNode, bodyOrbit.ArgumentOfPeriapsis, primaryUnityPos));
+                bodyOrbit.SetNextOrbit(null);
             }
             else
             {
-                DVector3 newVelocityVector;
                 double tempV = body.Orbit().TrueAnomaly;
                 bodyOrbit.TrueAnomaly = trueAnomalyAtEscape;
-                DVector3 bodyVelocityVec = OrbitalMechanics.VelocityVector(bodyOrbit, body, primary);
-                DVector3 primaryVelocityVec = OrbitalMechanics.VelocityVector(primary.Orbit(), primary, primary.Primary);
-                newVelocityVector = bodyVelocityVec + primaryVelocityVec;
+                DVector3 newVelocityVector = OrbitalMechanics.VelocityVector(bodyOrbit, body, primary) + OrbitalMechanics.VelocityVector(primary.Orbit(),
+                                                                                                                               primary, primary.Primary);
                 bodyOrbit.TrueAnomaly = tempV;
 
                 body.Orbit().TrueAnomaly = trueAnomalyAtEscape;
@@ -381,7 +402,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 Orbit newOrbit = OrbitalMechanics.OrbitalElementsFromStateVectors(newPositionVector, newVelocityVector, primary.Primary.mass, body);
 
                 bodyOrbit.SetNextOrbit(newOrbit);
-
+                    
                 DrawOrbitInEditor(primary.Primary.transform.position, Color.yellow, body, primary.Primary, newOrbit);
             }
         }
@@ -405,6 +426,26 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         public void SetNextOrbit(Orbit orbit)
         {
             nextOrbit = orbit;
+        }
+
+        public Orbit GetNextOrbit()
+        {
+            return nextOrbit;
+        }
+
+        public void SetHillSphereExitTrueAnomaly(double trueAnomaly)
+        {
+            hillSphereExitTrueAnomaly = trueAnomaly;
+        }
+
+        public double GetHillSphereExitTrueAnomaly()
+        {
+            return hillSphereExitTrueAnomaly;
+        }
+
+        public void DebugLogOrbit()
+        {
+            Debug.Log("a: " + SemiMajorAxis + ", e: " + Eccentricity + ", i: " + Inclination + ", omega: " + LongitudeOfAscendingNode + ", argpe: " + ArgumentOfPeriapsis);
         }
 
     }   // Orbital elements container
@@ -464,6 +505,23 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             
             manager.transform.position = -DVector3.GetFloatVector(focusPos); // Move manager object so focus is positioned at 0,0,0 in unity space
             currentFocus = focus.gameObject;    // set new focus
+        }
+
+        public void AddBody()
+        {
+            GameObject newBody = Instantiate(new GameObject(), transform);
+            newBody.transform.parent = transform;
+            newBody.name = "Body";
+            GameObject tempSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            tempSphere.transform.parent = newBody.transform;
+            tempSphere.transform.localPosition = new Vector3(0, 0, 0);
+
+            Body newBodyComponent = newBody.AddComponent<Body>();
+
+            newBodyComponent.mass = Star.Mass;
+            newBodyComponent.Diameter = Star.Diameter;
+
+            currentFocus = newBodyComponent.gameObject;
         }
 
         public static Body GetCurrentFocus()
