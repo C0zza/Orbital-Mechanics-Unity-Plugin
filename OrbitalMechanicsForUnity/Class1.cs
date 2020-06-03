@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEditor;
 
+// Corrie Anderson - CGP 601 - AE2 - Project Plugin
+
 namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics into the Unity 3D Engine
 {
     [Serializable]
@@ -19,6 +21,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         DVector3    position;          // Universe position
         bool        accelerating = false;
         DVector3    velocityVector;
+        double      thrustPower = 0d;
 
         bool        hasBeenScaled = false;
         public void UpdateBody()    // Update body parameters/ details
@@ -32,7 +35,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                         velocityVector = OrbitalMechanics.VelocityVector(orbit, this, Primary);
                     }
 
-                    velocityVector += new DVector3(gameObject.transform.forward * 1000) / mass; // Apply thrust
+                    velocityVector += (new DVector3(gameObject.transform.forward) * thrustPower) / mass; // Apply thrust
                                                                                                                           // Calculate centripetal force (gravity of primary)
                     DVector3 centripetalForce = OrbitalMechanics.PositionVector(this, this.Primary).Normalized() * -Math.Pow((OrbitalMechanics.Velocity(Primary.mass, Primary.position,
                                                                                     position, orbit.SemiMajorAxis)), 2d) / DVector3.Distance(position, Primary.position);
@@ -105,14 +108,16 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 }
             }
         }
-        public void StartAccelerating()
+        public void StartAccelerating(double thrust)
         {
             accelerating = true;
+            thrustPower = thrust;
         }
         public void StopAccelerating()
         {
             accelerating = false;
             velocityVector = null;
+            thrustPower = 0;
         }
         public void AddOrbitingBody(double mass = 1)
         {
@@ -140,6 +145,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             }
 
             newBodyComponent.Primary = this;
+            DestroyImmediate(GameObject.Find("New Game Object"));
         }
         public DVector3 GetPosition()   // Get universe position of object
         {
@@ -481,16 +487,24 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
     }   // Orbital elements container
 
+    [Serializable]
     public class UniverseManager : MonoBehaviour // Manage global parameters effecting all bodies
     {
         static double TimeScale = 1d;      // Amount of game seconds passed per second
         static double UniverseScale = 10d; // 1 Astronomical Unit = universe scale unity units
-        public static bool scaled = false; 
-        static GameObject currentFocus = null;
+        public static bool scaled = true; 
+        public static GameObject currentFocus = null;
+        public GameObject startingFocus = null;
 
         public static BodyPreset Star = new BodyPreset(1392700000d, 1.989e+30d, 0d);            // Celestial body presets so users have something to refer to
         public static BodyPreset Planet = new BodyPreset(12742000d, 5.972e+24d, 149598023000d); // when inputting parameters
         public static BodyPreset Moon = new BodyPreset(3474200d, 7.3476731e+22d, 384748000d);
+
+        private void Start()
+        {
+            currentFocus = startingFocus;
+            Focus(currentFocus.GetComponent<Body>());
+        }
 
         public static void SetTimeScale(double timeScale)
         {
@@ -533,7 +547,9 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             if(focus.Primary) focusPos = focus.GetWorldPosition() / OrbitalMechanics.Scalar * GetUniverseScale();
             else focusPos = new DVector3(0, 0, 0);
-            
+
+            //Selection.activeGameObject = focus.Primary.gameObject;
+
             manager.transform.position = -DVector3.GetFloatVector(focusPos); // Move manager object so focus is positioned at 0,0,0 in unity space
             currentFocus = focus.gameObject;    // set new focus
         }
@@ -541,7 +557,6 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         public void AddBody()
         {
             GameObject newBody = Instantiate(new GameObject(), transform);
-            newBody.transform.parent = transform;
             newBody.name = "Body";
             GameObject tempSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             tempSphere.transform.parent = newBody.transform;
@@ -553,11 +568,33 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             newBodyComponent.Diameter = Star.Diameter;
 
             currentFocus = newBodyComponent.gameObject;
+            DestroyImmediate(GameObject.Find("New Game Object"));
         }
 
         public static Body GetCurrentFocus()
         {
             return currentFocus.GetComponent<Body>();
+        }
+    }
+
+    [CustomEditor(typeof(UniverseManager))]
+    public class UniverseManagerEditor : Editor
+    {
+        SerializedProperty focus;
+        void OnEnable()
+        {
+            focus = serializedObject.FindProperty("startingFocus");
+        }
+
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
+
+            UniverseManager um = (UniverseManager)target;
+            EditorGUILayout.ObjectField(focus);
+            if (GUILayout.Button("Add Body")) um.AddBody();
+
+            serializedObject.ApplyModifiedProperties();
         }
     }
 
