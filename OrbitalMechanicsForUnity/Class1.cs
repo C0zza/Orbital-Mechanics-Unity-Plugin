@@ -19,6 +19,8 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         DVector3    position;          // Universe position
         bool        accelerating = false;
         DVector3    velocityVector;
+
+        bool        hasBeenScaled = false;
         public void UpdateBody()    // Update body parameters/ details
         {
             if (UniverseManager.GetTimeScale() != 0 && Primary) // If time has not stopped and is orbiting something
@@ -35,9 +37,8 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                     DVector3 centripetalForce = OrbitalMechanics.PositionVector(this, this.Primary).Normalized() * -Math.Pow((OrbitalMechanics.Velocity(Primary.mass, Primary.position,
                                                                                     position, orbit.SemiMajorAxis)), 2d) / DVector3.Distance(position, Primary.position);
                     velocityVector += centripetalForce; // Apply centripetal force
-                    velocityVector *= UniverseManager.GetTimeScale();   // Adjust to current time scale (high time scales not recommended for accelerating)
 
-                    position += velocityVector * Time.deltaTime;  // Update position with new velocity vector
+                    position += velocityVector * Time.deltaTime * UniverseManager.GetTimeScale();  // Update position with new velocity vector
 
                     orbit = OrbitalMechanics.OrbitalElementsFromStateVectors(OrbitalMechanics.PositionVector(this, this.Primary), velocityVector, Primary.mass, this);    // Update orbital elements
                 }
@@ -72,7 +73,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             position = GetWorldPosition();  // Initialise universe position
 
-            if(UniverseManager.scaled && Primary)   // If universe is currently being scaled and this body is orbiting something
+            if (UniverseManager.scaled && Primary)   // If universe is currently being scaled and this body is orbiting something
             {                                                             // Set game position to new universe position
                 gameObject.transform.localPosition = DVector3.GetFloatVector(OrbitalMechanics.PositionInOrbit(orbit)) /
                                             (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
@@ -86,6 +87,22 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             {                                                             // Set game position to new universe position
                 transform.position = DVector3.GetFloatVector((GetWorldPosition() - UniverseManager.GetCurrentFocus().GetComponent<Body>().GetWorldPosition())
                                                                                               / OrbitalMechanics.Scalar * UniverseManager.GetUniverseScale());
+                Vector3 d = transform.position;
+                if(d.magnitude > 3000)
+                {
+                    transform.position = d.normalized * 3000;
+                    float scaledDiameter = (float)((Diameter / OrbitalMechanics.Scalar * UniverseManager.GetUniverseScale()) * (3000d / d.magnitude));
+                    transform.GetChild(0).localScale = new Vector3(scaledDiameter, scaledDiameter, scaledDiameter);
+                    if(!hasBeenScaled) hasBeenScaled = true;
+                }
+                else
+                {
+                    float diameter = (float)Diameter / (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
+                    if (transform.localScale.x != diameter)
+                    {
+                        transform.GetChild(0).transform.localScale = new Vector3(diameter, diameter, diameter);
+                    }
+                }
             }
         }
         public void StartAccelerating()
@@ -141,7 +158,8 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             }
             else // Body does not orbit anything
             {                                                                               // Convert and return game position to universe position
-                return new DVector3(transform.position - GameObject.Find("UniverseManager").transform.position) * OrbitalMechanics.AstronomicalUnit;
+                //return new DVector3(transform.position - GameObject.Find("UniverseManager").transform.position) * OrbitalMechanics.AstronomicalUnit;
+                return new DVector3(0, 0, 0);
             }
         }
         public Orbit Orbit()    // Get this body's orbit/ orbital elements
@@ -152,8 +170,18 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         {
             if(DrawHillSphere)
             {
+                float r = (float)(hillSphereRadius / OrbitalMechanics.Scalar * UniverseManager.GetUniverseScale());
+
+                if(Application.isPlaying)
+                {
+                    if (hasBeenScaled)
+                    {
+                        r *= (3000 / (float)GetWorldPosition().Magnitude());
+                    }
+                }
+
                 Gizmos.color = Color.blue;
-                Gizmos.DrawWireSphere(gameObject.transform.position, (float)(hillSphereRadius / OrbitalMechanics.Scalar * UniverseManager.GetUniverseScale()));
+                Gizmos.DrawWireSphere(gameObject.transform.position, r);
             }
         }
     }       // Main component of the plugin, provides the behaviours of a satellite in space
@@ -245,10 +273,13 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
             if (!body) return;  // If no body returned, exit OnSceneGUI
 
-            float diameter = (float)body.Diameter / (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
-            if (body.gameObject.transform.localScale.x != diameter)
+            if(!Application.isPlaying)
             {
-                body.gameObject.transform.Find("Sphere").transform.localScale = new Vector3(diameter, diameter, diameter);
+                float diameter = (float)body.Diameter / (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
+                if (body.gameObject.transform.localScale.x != diameter)
+                {
+                    body.gameObject.transform.Find("Sphere").transform.localScale = new Vector3(diameter, diameter, diameter);
+                }
             }
 
             if(body.Primary)    // If the body is orbiting something
