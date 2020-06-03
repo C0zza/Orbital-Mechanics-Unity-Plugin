@@ -6,9 +6,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 {
     [Serializable]
     public class Body : MonoBehaviour   
-    {
-        static int numberOfAcceleratingBodies = 0;
-
+    { 
         public double   Diameter = 1d;
         public double   mass = 5972000000000000000000000d;    // Mass in kg of the body
         public double   hillSphereRadius;                     // The radius of this influence
@@ -21,7 +19,6 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         DVector3    position;          // Universe position
         bool        accelerating = false;
         DVector3    velocityVector;
-        double      thrustAmount = 0;
         public void UpdateBody()    // Update body parameters/ details
         {
             if (UniverseManager.GetTimeScale() != 0 && Primary) // If time has not stopped and is orbiting something
@@ -33,30 +30,16 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                         velocityVector = OrbitalMechanics.VelocityVector(orbit, this, Primary);
                     }
 
-                    velocityVector += (new DVector3(gameObject.transform.forward) * thrustAmount) / mass; // Apply thrust
+                    velocityVector += new DVector3(gameObject.transform.forward * 1000) / mass; // Apply thrust
                                                                                                                           // Calculate centripetal force (gravity of primary)
-                    DVector3 centripetalForce = OrbitalMechanics.PositionVector(this, this.Primary).Normalized() * -Math.Pow((OrbitalMechanics.Velocity(Primary.mass,
-                                                              Primary.position, position, orbit.SemiMajorAxis)), 2d) / DVector3.Distance(position, Primary.position);
-
+                    DVector3 centripetalForce = OrbitalMechanics.PositionVector(this, this.Primary).Normalized() * -Math.Pow((OrbitalMechanics.Velocity(Primary.mass, Primary.position,
+                                                                                    position, orbit.SemiMajorAxis)), 2d) / DVector3.Distance(position, Primary.position);
                     velocityVector += centripetalForce; // Apply centripetal force
                     velocityVector *= UniverseManager.GetTimeScale();   // Adjust to current time scale (high time scales not recommended for accelerating)
 
                     position += velocityVector * Time.deltaTime;  // Update position with new velocity vector
 
-                    if (Double.IsNaN(velocityVector.x))
-                    {
-                        Debug.Log("NNNAAAAAANNNN");
-                    }
-                    DVector3 positionVector = OrbitalMechanics.PositionVector(this, Primary);
-
-                    if (Double.IsNaN(positionVector.x))
-                    {
-                        Debug.Log("p NAAAAAANNN");
-                    }
-
-                    orbit = OrbitalMechanics.OrbitalElementsFromStateVectors(positionVector, velocityVector, Primary.mass, this);    // Update orbital elements
-
-                    orbit.DebugLogOrbit();
+                    orbit = OrbitalMechanics.OrbitalElementsFromStateVectors(OrbitalMechanics.PositionVector(this, this.Primary), velocityVector, Primary.mass, this);    // Update orbital elements
                 }
                 else
                 {
@@ -69,16 +52,6 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
                     position = GetWorldPosition();  // Update universe position
                 }
-
-                //if(orbit.GetNextOrbit() != null)    // If on an escape trajectory
-                //{
-                //    if (orbit.TrueAnomaly >= orbit.GetHillSphereExitTrueAnomaly())  // Check if true anomaly is greater than true anomaly at hill sphere exit
-                //    {
-                //        orbit = orbit.GetNextOrbit();   // Set new orbit
-                //        Primary = Primary.Primary;
-                //        transform.parent = Primary.transform.parent;
-                //    }
-                //}
             }                              
                 
         }
@@ -102,25 +75,14 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                                             (float)OrbitalMechanics.Scalar * (float)UniverseManager.GetUniverseScale();
             }
         }
-        public void StartAccelerating(double thrustAmount)
+        public void StartAccelerating()
         {
-            if(UniverseManager.GetTimeScale() <= UniverseManager.GetMaxTimeScaleDuringAcceleration())
-            {
-                this.thrustAmount = thrustAmount;
-                accelerating = true;
-                ++numberOfAcceleratingBodies;
-            }
-            else
-            {
-                Debug.LogWarning("Time scale exceeds max. Prevented acceleration.");
-            }
+            accelerating = true;
         }
         public void StopAccelerating()
         {
-            thrustAmount = 0d;
             accelerating = false;
             velocityVector = null;
-            --numberOfAcceleratingBodies;
         }
         public void AddOrbitingBody(double mass = 1)
         {
@@ -180,10 +142,6 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 Gizmos.color = Color.blue;
                 Gizmos.DrawWireSphere(gameObject.transform.position, (float)(hillSphereRadius / OrbitalMechanics.Scalar * UniverseManager.GetUniverseScale()));
             }
-        }
-        public static int GetNumberOfAcceleratingBodies()
-        {
-            return numberOfAcceleratingBodies;
         }
     }       // Main component of the plugin, provides the behaviours of a satellite in space
 
@@ -319,12 +277,11 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         [Range(0f, 360f)]
         public double TrueAnomaly;  // The current position within the orbit
 
-        public bool RenderOrbit;    // Whether to draw the orbit
+        public bool RenderOrbit;
         [Range(0f, 200f)]
-        public int OrbitResolution = 30;    // Number of vertices/ resolution of orbit path line
+        public int OrbitResolution = 30;
 
-        private Orbit nextOrbit = null; // Orbit to transition to if on escape trajectory
-        private double hillSphereExitTrueAnomaly = 0d;  // True anomaly where transition takes place
+        private Orbit nextOrbit = null;
 
         public Orbit()
         {
@@ -336,7 +293,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             TrueAnomaly = 0d;
             RenderOrbit = true;
         }
-        public void ValidateOrbit() // Keep orbital elements within valid range to prevent undefined behaviour
+        public void ValidateOrbit()
         {
             if (Inclination < 10e-8)
             {
@@ -353,14 +310,9 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                     ArgumentOfPeriapsis = 0d;
                 }
             }
-
-            if(TrueAnomaly > hillSphereExitTrueAnomaly) // Clamp true anomaly to escape path
-            {
-                TrueAnomaly = hillSphereExitTrueAnomaly;
-            }
         }
 
-        public void DrawOrbitInEditor(Vector3 primaryUnityPos, Color color, Body body, Body primary, Orbit bodyOrbit)   // Generate and draw orbit path
+        public void DrawOrbitInEditor(Vector3 primaryUnityPos, Color color, Body body, Body primary, Orbit bodyOrbit)
         {
             bool onEscapeTrajectory = false;
 
@@ -372,7 +324,7 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             {
                 trueAnomalyAtEscape = OrbitalMechanics.TrueAnomalyAtHillSphereExit(OrbitalMechanics.HillSphereRadius(body.Primary.GetWorldPosition(),
                            primary.Primary.GetWorldPosition(), primary.mass, primary.Primary.mass), bodyOrbit.Eccentricity, bodyOrbit.SemiMajorAxis);
-                bodyOrbit.SetHillSphereExitTrueAnomaly(trueAnomalyAtEscape);
+                
             }
 
             Handles.color = color;  // Set orbit color to magenta
@@ -411,29 +363,30 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
                 // Draw final line to complete orbit drawing
                 Handles.DrawLine(v1, OrbitalMechanics.PositionInOrbitMeasuredFromCenter(0d, bodyOrbit.SemiMajorAxis, bodyOrbit.Eccentricity,
                                 bodyOrbit.Inclination, bodyOrbit.LongitudeOfAscendingNode, bodyOrbit.ArgumentOfPeriapsis, primaryUnityPos));
-                bodyOrbit.SetNextOrbit(null);
             }
             else
             {
-                
-                double tempV = body.Orbit().TrueAnomaly;            // Calculate velocity vector at hill sphere exit
+                DVector3 newVelocityVector;
+                double tempV = body.Orbit().TrueAnomaly;
                 bodyOrbit.TrueAnomaly = trueAnomalyAtEscape;
-                DVector3 newVelocityVector = OrbitalMechanics.VelocityVector(bodyOrbit, body, primary) + OrbitalMechanics.VelocityVector(primary.Orbit(), primary, primary.Primary);
+                DVector3 bodyVelocityVec = OrbitalMechanics.VelocityVector(bodyOrbit, body, primary);
+                DVector3 primaryVelocityVec = OrbitalMechanics.VelocityVector(primary.Orbit(), primary, primary.Primary);
+                newVelocityVector = bodyVelocityVec + primaryVelocityVec;
                 bodyOrbit.TrueAnomaly = tempV;
 
-                body.Orbit().TrueAnomaly = trueAnomalyAtEscape;     // Calculate position vector at hill sphere exit
+                body.Orbit().TrueAnomaly = trueAnomalyAtEscape;
                 DVector3 newPositionVector = OrbitalMechanics.PositionVector(body, primary.Primary);
                 body.Orbit().TrueAnomaly = tempV;
-                                                                    // Calculate new orbit using state vectors
+
                 Orbit newOrbit = OrbitalMechanics.OrbitalElementsFromStateVectors(newPositionVector, newVelocityVector, primary.Primary.mass, body);
 
-                bodyOrbit.SetNextOrbit(null);
+                bodyOrbit.SetNextOrbit(newOrbit);
 
                 DrawOrbitInEditor(primary.Primary.transform.position, Color.yellow, body, primary.Primary, newOrbit);
             }
-        }  
+        }
 
-        public bool OnEscapeTrajectory(Body body, Body primary, Orbit bodyOrbit)    // Check whether currently on escape trajectory
+        public bool OnEscapeTrajectory(Body body, Body primary, Orbit bodyOrbit)
         {
             double ap = OrbitalMechanics.ApoapsisRadius(bodyOrbit.SemiMajorAxis, bodyOrbit.Eccentricity);
             double hsr = OrbitalMechanics.HillSphereRadius(primary.GetWorldPosition(), primary.Primary.GetWorldPosition(), primary.mass, primary.Primary.mass);
@@ -447,39 +400,18 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             {
                 return false;
             }
-        }   
+        }
 
         public void SetNextOrbit(Orbit orbit)
         {
             nextOrbit = orbit;
         }
 
-        public Orbit GetNextOrbit()
-        {
-            return nextOrbit;
-        }
-
-        public void SetHillSphereExitTrueAnomaly(double trueAnomaly)
-        {
-            hillSphereExitTrueAnomaly = trueAnomaly;
-        }
-
-        public double GetHillSphereExitTrueAnomaly()
-        {
-            return hillSphereExitTrueAnomaly;
-        }
-
-        public void DebugLogOrbit()
-        {
-            Debug.Log("a: " + SemiMajorAxis + ", e: " + Eccentricity + ", i: " + Inclination + ", omega: " + LongitudeOfAscendingNode + ", argpe: " + ArgumentOfPeriapsis);
-        }
-
     }   // Orbital elements container
 
-    public class UniverseManager : MonoBehaviour    // Manage global parameters effecting all bodies
+    public class UniverseManager : MonoBehaviour // Manage global parameters effecting all bodies
     {
         static double TimeScale = 1d;      // Amount of game seconds passed per second
-        static double MaxTimeScaleDuringAcceleration = 4d;
         static double UniverseScale = 10d; // 1 Astronomical Unit = universe scale unity units
         public static bool scaled = false; 
         static GameObject currentFocus = null;
@@ -490,51 +422,17 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
         public static void SetTimeScale(double timeScale)
         {
-            if(Body.GetNumberOfAcceleratingBodies() < 1)
-            {
-                TimeScale = timeScale;
-            }
-            else
-            {
-                if(timeScale <= MaxTimeScaleDuringAcceleration)
-                {
-                    TimeScale = timeScale;
-                }
-                else
-                {
-                    Debug.LogWarning("Time scale is too large because there are bodies under acceleration. Reduce time scale to " + MaxTimeScaleDuringAcceleration);
-                }
-            }
+            TimeScale = timeScale;
         }
 
         public static void IncreaseTimeScale(double increaseBy)
         {
-            if (Body.GetNumberOfAcceleratingBodies() < 1)
-            {
-                TimeScale += increaseBy;
-            }
-            else
-            {
-                if(TimeScale + increaseBy <= MaxTimeScaleDuringAcceleration)
-                {
-                    TimeScale += increaseBy;
-                }
-                else
-                {
-                    Debug.LogWarning("Time scale is too large because there are bodies under acceleration. Reduce time scale to " + MaxTimeScaleDuringAcceleration);
-                }
-            }
-
+            TimeScale += increaseBy;
         }
 
         public static double GetTimeScale()
         {
             return TimeScale;
-        }
-
-        public static double GetMaxTimeScaleDuringAcceleration()
-        {
-            return MaxTimeScaleDuringAcceleration;
         }
 
         public static void SetUniverseScale(double scale)
@@ -568,28 +466,11 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
             currentFocus = focus.gameObject;    // set new focus
         }
 
-        public void AddBody()
-        {
-            GameObject newBody = Instantiate(new GameObject(), transform);
-            newBody.transform.parent = transform;
-            newBody.name = "Body";
-            GameObject tempSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            tempSphere.transform.parent = newBody.transform;
-            tempSphere.transform.localPosition = new Vector3(0, 0, 0);
-
-            Body newBodyComponent = newBody.AddComponent<Body>();
-
-            newBodyComponent.mass = Star.Mass;
-            newBodyComponent.Diameter = Star.Diameter;
-
-            currentFocus = newBodyComponent.gameObject;
-        }
-
         public static Body GetCurrentFocus()
         {
             return currentFocus.GetComponent<Body>();
         }
-    }   // Manage global parameters effecting all bodies
+    }
 
     public class OrbitalMechanics   // The mathematics behind orbital mechanics
     {
@@ -887,18 +768,18 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
 
         public static double Velocity(double primaryMass, DVector3 primaryPos, DVector3 bodyPos, double semiMajorAxis)  // Calculate velocity within an elliptical orbit
         {   // Formula for eliptical orbit velocity. Found at: http://www.braeunig.us/space/orbmech.htm#position (4.45)
-            //bool negativeN = false;
+            bool negativeN = false;
             double n = GravitationalConstant * primaryMass * (2d / DVector3.Distance(primaryPos, bodyPos) - 1d / semiMajorAxis);
 
-            //if (n < 0)
-            //{
-            //    n = -n;
-            //    negativeN = true;
-            //}
+            if (n < 0)
+            {
+                n = -n;
+                negativeN = true;
+            }
 
             double v = Math.Sqrt(n);
 
-            //if (negativeN) v = -v;
+            if (negativeN) v = -v;
             return v;
         }
 
@@ -988,10 +869,10 @@ namespace OrbitalMechanicsForUnity  // Plugin to implement orbital mechanics int
         }
     }   // Struct to save certain data about a body/orbit
 
-    public enum BodyType    // Enum used for drop down in body inspector
+    public enum BodyType
     {
         Star, Planet, Moon, Custom
-    }  
+    }
 
     public class DVector3   // Double precision 3D vector
     {
